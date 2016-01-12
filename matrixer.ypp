@@ -127,10 +127,25 @@
 	*******************************/
 
 %token LP RP LC RC LB RB SC TYPE ID NUM
+%token LEQ GEQ LESS GREATER EQ NEQ NOT PRINT READ STRING TRUE FALSE WHILE FOREACH
  // Assignment is right-associative: a=b=c ==> a=(b=c)
 %right ASSIGN
  // The comma sign needs to be associative: int a,b,c ==> int (a,b),c
 %left CS
+ // We need to make ELSE higher priority then the IF rule.
+ // Give IF a priority, and make ELSE's priority higher.
+ // Then use %prec to set the IF rule's priority to the IF token's priority.
+%nonassoc IF
+%nonassoc ELSE
+ // Boolean operators should have priority less than any arithmetic operators,
+ // because (for example) "3<2+2" should be TRUE.
+ // These should be associative, and make AND higher priority to correctly
+ // evaluate (a OR b AND c)==(a OR (b AND c)) 
+%left OR
+%left AND
+ // The IN token needs lower priority than arithmetic operators, so we can do
+ // something like "2 IN [1]+[1]" (should evaluate to TRUE).
+%nonassoc IN
  // It should be a good idea to make UNARY_MINUS the highest priority.
  // Assuming it's really a UNARY minus and not a regular one, the value
  // should be negated before other operations:
