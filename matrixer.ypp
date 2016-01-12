@@ -1,0 +1,970 @@
+%{
+	#include <iostream>
+	#include <list>
+	#include <set>
+	#include <vector>
+	#include <string>
+//	#include <unordered_map>	Not standard, use regular map instead
+	#include <map>
+	#include "attributes.h"
+	#include "printError.h"
+	using std::cout;
+	using std::endl;
+	using std::list;
+	using std::set;
+	using std::vector;
+//	using std::unordered_map;	Non-standard
+	using std::map;
+	/** TODO: Before submitting, set DEBUG to 0 (from attributes.h) */
+	#if DEBUG
+		#define YYERROR_VERBOSE 1
+	#endif
+	
+	extern int yylex();
+	int yyerror(char const*);
+	
+	/*******************************
+				GLOBALS
+	*******************************/
+	
+	// List of recently declared variable names.
+	// Updated primarily in InitIter rules, used to print out the
+	// values of all newly declared variables.
+	// After every Stmt, this list is reset (cleared).
+	list<string> declaration_list;
+	
+	// Map of symbols, linked to their data
+//	unordered_map<string,YYSTYPE> symbol_table;	Non-standard
+	map<string,YYSTYPE> symbol_table;
+		
+	/*******************************
+		  SEMANTIC VALIDATORS
+	*******************************/
+	
+	// Make sure the two operands can perform the operation.
+	void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, char op);
+	
+	// Asserts both matrices are of the same dimensions
+	void assert_matrices_of_same_dimensions(const YYSTYPE& stype_left, const YYSTYPE& stype_right, const string op_str, bool is_matrix_declaration = false);
+	
+	// Make sure the name is available:
+	void assert_available_name(const string str);
+	
+	// Make sure the variable name is declared already.
+	void assert_declared(const string str);
+	
+	// Make sure the value is positive
+	void assert_positive(int value);
+	
+	
+	// Make sure the given argument is a positive constant (for matrix
+	// definitions).
+	void assert_matrix_arg(const YYSTYPE& stype);
+	
+	// Same as above, only it must be non-negative.
+	// On error, outputs PositiveNumberExpected
+	void assert_matrix_dereference_arg(const YYSTYPE& stype);
+	
+	// Use this in the construction of matrices using the [1,2;3,4] notation.
+	// Input: two numbers, representing column sizes. Make sure they have the
+	// same amount of columns.
+	void assert_column_match(int col1, int col2);
+	
+	// Make sure the rows/columns are withing the bounds of the matrix
+	void assert_in_bounds(const YYSTYPE& matrix, int rows, int cols);
+	
+	// Make sure that the expression is not a matrix.
+	void assert_scalar(const YYSTYPE& stype);
+
+	void assert_matrix(const YYSTYPE& stype);
+
+	// Make sure we can multiply the two operands.
+	// This test is also used to test for matrix iteration, so add an extra flag so we know the type
+	// of error to report.
+	void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2, bool for_iteration);
+	
+	// Make sure we can concatenate two matrices.
+	// Also makes sure they are matrices!
+	void assert_concative(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+	void assert_non_zero(int num);
+	
+	void assert_matching_declaration_type(bool is_matrix_declaration_syntax);
+	
+	/*******************************
+			UTILITY FUNCTIONS
+	*******************************/
+
+	ArgumentType is_matrix_to_type(bool is_matrix);
+	
+	// Prints out the contents of the given YYSTYPE, using the printing conventions defined.
+	// DOES NOT print the name (doesn't print the "ID=\n" part), because some printed values have no
+	// names.
+	void print_stype(const YYSTYPE& stype);
+	
+	void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const);
+
+	void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols, 
+		const vector< vector<int> >& matrix);
+	
+	// Negate the value of the input, whether it's a scalar or matrix.
+	// The values of is_int_const and is_matrix are copied.
+	YYSTYPE negate(const YYSTYPE& stype);
+	
+	// Add the two values (matrix or not).
+	// Assume addition is allowed! Error handling should be done in the semantic analysis!
+	// The value of is_matrix is copied, and the value of is_int_const is calculated.
+	YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+	// Multiply the two variables.
+	// This should work for any combination of operand types.
+	// Calculates is_matrix and is_int_const, and the rows/columns if is_matrix=true.
+	// ASSUMES MULTIPLICATION IS LEGAL!
+	YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2);
+	YYSTYPE raise_matrix_to_power(const YYSTYPE& matrix_op, 
+		const YYSTYPE& exponent_op);
+	YYSTYPE transpose(const YYSTYPE& op);
+	YYSTYPE concat(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+%}
+
+	/*******************************
+	********************************
+				TOKENS
+	********************************
+	*******************************/
+
+%token LP RP LC RC LB RB SC TYPE ID NUM
+ // Assignment is right-associative: a=b=c ==> a=(b=c)
+%right ASSIGN
+ // The comma sign needs to be associative: int a,b,c ==> int (a,b),c
+%left CS
+ // It should be a good idea to make UNARY_MINUS the highest priority.
+ // Assuming it's really a UNARY minus and not a regular one, the value
+ // should be negated before other operations:
+ // 3*-2=-6
+ // Maybe this doesn't matter, but make it a high priority anyway - under
+ // the assumption that the lexical analyzer correctly identifies true
+ // unary minuses.
+ // Note that if M is a matrix, then -M is not legal! No need to prioritize
+ // between the unary minus and the iteration (^) sign
+%left MINUS PLUS
+%left MUL DIV
+%nonassoc UNARY_MINUS
+ // Associativity of CONCAT is needed. Make sure it isn't as important as
+ // ITERATION, but more important than anything else.
+%left CONCAT
+ // The only time an iteration can be found is in the case of M^x where
+ // M is a matrix and x is a number. No need for associativity, but we
+ // need priority for cases like M::N^2 - we need to first iterate and
+ // then concatenate.
+%nonassoc ITERATION
+%token TRANSPOSE
+
+
+%%
+
+	/*******************************
+	********************************
+				RULES
+	********************************
+	*******************************/
+
+ // To simulate BNF iteration, use XIter variables for every X with iterations.
+Stmts			:	Stmt IterStmts {
+						// Nothing to do here.
+					}
+				;
+
+IterStmts		:	Stmt IterStmts {
+						// Nothing to do here.
+					}
+				|	{
+						// Nothing to do here.
+					}
+				;
+
+Stmt			:	TYPE Init InitIter SC {
+						// Enforce the types of the declared variables.
+						// Do this by iterating over the variables declared in
+						// InitIter (and in the first Init) and comparing their
+						// type to the TYPE token.
+						// Print all newly declared variables and their values,
+						// when done delete the declaration_list.
+						bool is_matrix = $1.is_matrix;
+						for (list<string>::iterator i=declaration_list.begin(); i!=declaration_list.end(); ++i) {
+							YYSTYPE stype = symbol_table[*i];
+							// if (stype.is_matrix != is_matrix)
+								// ERROR_HANDLER(GeneralSemanticError); // TODO: Specific error?
+							cout << stype.name << "=" << endl;
+							print_stype(stype);	
+						}
+						declaration_list.clear();
+					}
+				|	Exp SC {
+						// If Exp is constant, print the value according to the data
+						// type.
+						print_stype($1);
+					}
+				;
+
+Init			:	ID {
+						// Set the value to zero and the type to number (if we were
+						// declaring a matrix, the production rule would be the one
+						// with the brackets: x[a,b]).
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table'), and if not - add it.
+						// Add the data to the list of newly declared variables
+						// declaration_list.
+						assert_matching_declaration_type(false);
+						
+						assert_available_name($1.name);
+						set_stype_to_int($$, $1.name, 0, false);
+						symbol_table[$$.name] = $$;
+						declaration_list.push_back($$.name);
+					}
+				|	ID ASSIGN Exp {
+						// Set type to integer, make sure Exp's type is the same.
+						// No need to make sure Exp.name has been declared or is constant,
+						// this is taken care of in the derivation of Exp.
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table').
+						// Add the name to the symbol table.
+						// Add the data to the list of newly declared variables
+						// declaration_list.					
+						assert_matching_declaration_type(false);
+						
+						assert_available_name($1.name);
+						assert_scalar($3);
+						
+						set_stype_to_int($$, $1.name, $3.value, false);
+						
+						symbol_table[$$.name] = $$;
+						declaration_list.push_back($$.name);
+					}
+				|	ID LP Exp CS Exp RP {
+						// Make sure the expressions are positive (not non-
+						// negative, that's not enough... no such thing as a 0x0
+						// matrix).
+						// Make sure both Exp(s) are constant!
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table'), and if not - add it.
+						// Add the data to the list of newly declared variables
+						// declaration_list.
+						assert_matching_declaration_type(true);
+												
+						assert_matrix_arg($3);
+						assert_matrix_arg($5);
+						assert_available_name($1.name);
+						
+						set_stype_to_matrix($$, $1.name, 
+							$3.value, $5.value,
+							vector< vector<int> >());
+						$$.matrix.resize($$.rows, vector<int>($$.cols, 0));
+						symbol_table[$$.name] = $$;
+						declaration_list.push_back($$.name);
+					}
+				|	ID LP Exp CS Exp RP ASSIGN Exp {
+						// Several things need to be enforced here:
+						// 1. Make sure the first two Exps are non-negative constants
+						// 2. Make sure the third Exp is a matrix, with the same
+						//    number of rows/columns as ID
+						// After that, assign.
+						// Make sure all three Exp.name(s) have been declared,
+						// and make sure the first two Exp(s) are constant!
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table'), and if not - add it.
+						// Add the data to the list of newly declared variables
+						// declaration_list.
+						assert_matching_declaration_type(true);
+						
+						assert_matrix_arg($3);
+						assert_matrix_arg($5);
+						assert_available_name($1.name);
+						
+						set_stype_to_matrix($$, $1.name, 
+							$3.value, $5.value, $8.matrix);
+						
+						assert_matrices_of_same_dimensions($$, $8, "=", true);
+						
+						symbol_table[$$.name] = $$;
+						declaration_list.push_back($$.name);
+					}
+				;
+
+InitIter		:	CS Init InitIter {
+						// No need to do anything special in these iterations.
+					}
+				|	{
+						// No need to do anything special in these iterations.
+					}
+				;
+
+Exp				:	Exp PLUS Exp {
+						// Enforce same types of expressions, calculate the value.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						// The result is a matrix if and only if the left operand is
+						// a matrix (there is a mismatch error if the two operands
+						// are of different types).
+						// Make sure the matrices are of the same dimensions (if
+						// we're summing matrices).
+						assert_type_match($1,$3,'+');
+						if ($1.is_matrix)
+							assert_matrices_of_same_dimensions($1,$3,"+");
+						$$ = add($1,$3);
+					}
+				|	Exp MINUS Exp {
+						// Enforce same types of expressions, calculate the value.
+						// Make sure both Exp(s) are either constant or have
+						// been declared.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						assert_type_match($1,$3,'-');
+						if ($1.is_matrix)
+							assert_matrices_of_same_dimensions($1,$3,"-");
+						$$ = add($1,negate($3));						
+					}
+				|	Exp MUL Exp {
+						// The operation done here depends on the types of the
+						// expressions (matrix*matrix, num*num or a combination).
+						// Make sure both Exp(s) are either constant or have
+						// been declared.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						DO_DEBUG(cout << "multiplying... ");
+						assert_type_match($1,$3,'*');	// This should always be OK...
+						assert_multiplicative($1,$3,false);
+						$$ = mul($1,$3);
+						DO_DEBUG(cout << "multiplied" << endl);
+					}
+				|	Exp DIV Exp {
+						// Make sure neither is a matrix, and calculate the value.
+						// Make sure both Exp(s) are either constant or have
+						// been declared.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						assert_type_match($1,$3,'/');
+						assert_non_zero($3.value);
+						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
+					}
+				|	UNARY_MINUS Exp {
+						// Negate the value (may be a matrix!).
+						// Set the left Exp's is_int_const field to the is_int_const field of the right-side
+						// Exp.
+						$$ = negate($2);
+						DO_DEBUG(cout << "negated a");
+						DO_DEBUG(cout << ($2.is_matrix ? " matrix" : "n int"));
+						DO_DEBUG(cout << " into a" << ($$.is_matrix ? " matrix" : "n int"));
+						DO_DEBUG(cout << endl);
+					}
+				|	Mat {
+						// Update values (rows, columns, matrix data) and update
+						// the is_int_const field (using Mat.is_int_const).
+						// If Mat is undeclared, this should be caught in the
+						// reduction to Mat.
+						$$ = $1;	// All relevant field will be correctly copied
+					}
+				|	NUM {
+						// Update the value, set as constant number.
+						set_stype_to_int($$, "", $1.value, true);
+					}
+				|	ID {
+						// All IDs have values, types etc. Copy them, and set
+						// Exp to non-constant. Make sure ID.name has been declared!
+						assert_declared($1.name);
+						// Let Exp equal the value of the symbol, using the symbol table.
+						$$ = symbol_table[$1.name];
+						DO_DEBUG(if ($$.is_int_const != false) cout << 
+							"ERROR: ID's is_int_const is not set to false!" << endl;);
+					}
+				|	LP Exp RP {
+						// Copy the data from the Exp on the right side of the
+						// production rule to the Exp on the left.
+						// Set the left Exp's is_int_const field to the 
+						// is_int_const field of the right-side Exp.
+						$$ = $2;
+					}
+				|	ID LB Exp CS Exp RB {
+						// This is dereferencing a matrix slot.
+						// Make sure ID is a matrix, both expressions are non-negative numbers
+						// and that they are within the bounds of the rows/columns
+						// of the matrix.
+						// Make sure ID has been declared, and that both Exps on the right are
+						// valid matrix arguments (constant and positive).
+						// Set the left Exp's is_int_const field to 0 (no way to write [1,2;3,4][1,1] - 
+						// cannot dereference a constant matrix).
+						// TODO: Is this legal: [1,2;3,4][1,0]? Should evaluate to 3?
+						assert_declared($1.name);
+						// Get the data from the symbol table
+						YYSTYPE stype = symbol_table[$1.name];
+						// Make sure this is a matrix...
+						assert_matrix(stype);
+						// From the PDF, page 3:
+						// "When dereferencing a cell in a matrix, both numbers must be non-negative
+						// constant integers". So, they must be like the argument arg1,arg2 in
+						// statements like matrix m(arg1,arg2):
+						assert_matrix_dereference_arg($3);
+						assert_matrix_dereference_arg($5);
+						
+						assert_in_bounds(stype,$3.value,$5.value);
+						set_stype_to_int($$, "", stype.matrix[$3.value][$5.value], false);
+					}
+				;
+
+/** Before removing Mat:ID (this caused the grammar to be ambiguous):
+Mat				:	LB Exp MatFirstIter MatSecondIter RB
+				|	ID
+				|	Mat CONCAT Mat
+				|	Mat ITERATION LP Exp RP %prec ITERATION
+				|	TRANSPOSE LP Mat RP
+				;*/
+
+/** After removal: */
+Mat				:	LB Exp MatFirstIter MatSecondIter RB {
+						// Make sure the number of columns created in MatFirstIter
+						// (which is the iteration for the first row of numbers) is
+						// consistent with the number of columns created by all rows
+						// of MatSecondIter. We don't have to check all the rows in
+						// from the MatSecondIter reduction, because the reduction
+						// to MatSecondIter can check if each new row is consistent.
+						// On the other hand, the first iteration of SecondIter
+						// doesn't check the number of rows for consistency, so at
+						// least one of the rows of the matrix reduced by SecondIter
+						// must be checked.
+						// Make sure Exp is either declared or constant.
+						// For detailed comments, see MatSecondIter.
+						assert_scalar($2);
+						if ($4.rows != 0)
+							assert_column_match($3.cols+1,$4.cols);
+						set_stype_to_matrix($$, "", $4.rows+1, $3.cols+1,
+							vector< vector<int> >());
+						$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
+						// Update the first row:
+						$$.matrix[0][0] = $2.value;
+						for(int i=1; i<$$.cols; ++i) {
+							$$.matrix[0][i] = $3.matrix[0][i-1];
+						}
+						// Update the rest, row by row
+						for (int i=1; i<$$.rows; ++i) {
+							$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
+						}
+					}
+				|	Mat CONCAT Mat {
+						// Make sure both are matrices 
+						// and have the same number of rows.
+						DO_DEBUG(cout << "concatenating... ");
+						assert_type_match($1, $3, ':');
+						assert_concative($1,$3);
+						
+						$$ = concat($1, $3);
+						DO_DEBUG(cout << "concatenated" << endl);
+					}
+				|	ID CONCAT Mat {
+						// Make sure the ID is of a matrix with the same number of
+						// rows as 'Mat' (and is declared)
+						assert_declared($1.name);
+						// Get the data
+						YYSTYPE stype = symbol_table[$1.name];
+						assert_type_match(stype, $3, ':');
+						assert_concative(stype,$3);//TODOGALY: change to ArgumentTypeMismatch??
+						
+						$$ = concat(stype, $3);
+					}
+				 // Set %prec here to make sure concatenation stays associative.
+				 // ID doesn't have priority, so we need to make sure this is solved
+				 // using associativity:
+				|	Mat CONCAT ID %prec CONCAT {
+						// Make sure the ID is of a matrix with the same number of
+						// rows as 'Mat' and is declared.
+						assert_declared($3.name);
+						// Get the data, validate it
+						YYSTYPE stype = symbol_table[$3.name];
+						assert_type_match($1, stype, ':');
+						assert_concative($1,stype);
+						
+						$$ = concat($1, stype);
+					}
+				|	ID CONCAT ID %prec CONCAT {
+						// Make sure both IDs exist and are matrices with the same
+						// amount of rows, and are declared.
+						assert_declared($1.name);
+						assert_declared($3.name);
+						// Get the data
+						YYSTYPE stype1 = symbol_table[$1.name];
+						YYSTYPE stype2 = symbol_table[$3.name];
+						// Validate it
+						assert_type_match(stype1, stype2, ':');
+						assert_concative(stype1,stype2);
+						
+						// Concatenate
+						$$ = concat(stype1, stype2);
+					}
+				 // Set %prec here to prefer iteration over concatenation:
+				|	Mat ITERATION LP Exp RP %prec ITERATION {
+						// Loop for Exp times (make sure Exp is a non-negative
+						// number, and that Mat is square).
+						assert_type_match($1, $4, '^');
+						assert_positive($4.value);
+						
+						assert_multiplicative($$, $$, true);
+						
+						$$ = raise_matrix_to_power($1, $4);
+					}
+				|	ID ITERATION LP Exp RP %prec ITERATION {
+						// Same as above, and in addition:
+						// Make sure ID is declared.
+						// Check if ID is a matrix.
+						assert_declared($1.name);
+						// Get the data
+						YYSTYPE stype = symbol_table[$1.name];
+						// Validate
+						assert_type_match(stype, $4, '^');
+						
+						assert_positive($4.value);
+						
+						assert_multiplicative(stype, stype, true);
+						
+						$$ = raise_matrix_to_power(stype, $4);
+					}
+				|	TRANSPOSE LP Mat RP {
+						// Transpose.
+						$$ = transpose($3);
+					}
+				|	TRANSPOSE LP ID RP {
+						// Check if ID is declared and a matrix, and transpose.
+						assert_declared($3.name);
+						// Get the data
+						YYSTYPE stype = symbol_table[$3.name];
+						assert_matrix(stype);
+						$$ = transpose(stype);
+					}
+				;
+
+MatFirstIter	:	CS Exp MatFirstIter {
+						// Make sure the expression is a number.
+						assert_scalar($2);
+						// We need to somehow record the number of columns created
+						// while iterating over this variable, s.t. the SecondIter
+						// variable will know how many columns must exist in each
+						// row.
+						// See the comments for MatSecondIter to understand what's going on here.
+						set_stype_to_matrix($$, "", 
+							1, $3.cols+1, 
+							vector< vector<int> >());
+						$$.matrix.resize($$.rows,vector<int>($$.cols,0));
+						$$.matrix[0][0] = $2.value;
+						for(int i=1; i<$$.cols; ++i) {
+							$$.matrix[0][i] = $3.matrix[0][i-1];
+						}
+					}
+				|	{
+						// Set rows and columns to zero (recursion base).
+						$$.rows = 0;
+						$$.cols = 0;
+					}
+				;
+
+MatSecondIter	:	SC Exp MatFirstIter MatSecondIter {
+						// Make sure the expression is a number.
+						assert_scalar($2);
+						// Make sure the number of columns created by MatFirstIter
+						// is equal to the number of columns in the first row of
+						// the matrix created by the MatSecondIter variable on the
+						// right of the production rule. If it was nullified (the
+						// SecondIter produced an empty matrix), no need to enforce
+						// anything - the Mat rule will take care of it.
+						// If SecondIter never expands to another row (never reduced
+						// using the current rule), the number of rows should be 1.
+						// How we do this:
+						// Assume MatFirstIter.matrix is a 1xn vector of ints, where n is the
+						// desired number of columns. Assume MatFirstIter.rows=1 and
+						// MatFirstIter.cols=n.
+						// Assume MatSecondIter.matrix is a valid axb sized matrix.
+						// Under these assumptions, simply compare n==b.
+						// Merge the matrices, update the number of rows (add 1) and number of
+						// columns (copy) and insert into $$.
+						// Note the +1, as the extra Exp should be accounted for.
+						// NOTE: If MatSecondIter.rows=0, this is the first iteration of the
+						// recursion logic so we should set the number of columns now.
+						if ($4.rows != 0)
+							assert_column_match($3.cols+1,$4.cols);
+						set_stype_to_matrix($$, "", 
+							$4.rows+1, $3.cols+1,
+							vector< vector<int> >());
+						$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
+						// Update the first row:
+						$$.matrix[0][0] = $2.value;
+						for(int i=1; i<$$.cols; ++i) {
+							$$.matrix[0][i] = $3.matrix[0][i-1];
+						}
+						// Update the rest, row by row
+						for (int i=1; i<$$.rows; ++i) {
+							$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
+						}
+					}
+				|	{
+						// Set the number of rows to zero, so the above iterations know we stopped
+						// here.
+						$$.rows = 0;
+						$$.cols = 0;
+					}
+				;
+
+%%
+
+/*******************************
+********************************
+		  C-FUNCTIONS
+********************************
+*******************************/
+
+int main() {
+	yyparse();
+}
+
+int yyerror(char const* message) {
+	ERROR_HANDLER(SyntaxError);
+}
+
+/*******************************
+	  SEMANTIC VALIDATORS
+*******************************/
+
+// Make sure the two operands can perform the operation.
+void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, char op) {
+	bool mismatch=0;
+	string op_str = (op == ':') ? "::" : string(1,op);
+	ArgumentType left_type = stype_left.is_matrix ? TypeMatrix : TypeInt;
+	ArgumentType right_type = stype_right.is_matrix ? TypeMatrix : TypeInt;
+	switch(op) {
+		case '+':
+		case '-':
+			mismatch = (stype_left.is_matrix != stype_right.is_matrix);
+			break;
+		case '^':
+			mismatch = (!stype_left.is_matrix || stype_right.is_matrix);
+			break;
+		case ':':
+			mismatch = (!stype_left.is_matrix || !stype_right.is_matrix);
+			break;
+		case '/':
+			mismatch = (stype_left.is_matrix || stype_right.is_matrix);
+			break;
+	}
+	if (mismatch) {
+		ERROR_HANDLER(ArgumentTypeMismatch, op_str, left_type, right_type);
+	}
+}
+
+// Asserts both matrices are of the same dimensions
+void assert_matrices_of_same_dimensions(
+	const YYSTYPE& stype_left, const YYSTYPE& stype_right, 
+	const string op_str, bool is_matrix_declaration) {
+	if ((!stype_left.is_matrix) || (!stype_right.is_matrix)) {
+		ERROR_HANDLER(MatrixExpected);
+	}
+	if (stype_left.rows != stype_right.rows) {
+		if (is_matrix_declaration)
+		{
+			ERROR_HANDLER(MatrixSemanticError);
+		}
+		else
+		{
+			ERROR_HANDLER(ArgumentSizeMismatch, op_str,
+				stype_left.rows, stype_right.rows);
+
+		}
+	}
+	if (stype_left.cols != stype_right.cols) {
+		if (is_matrix_declaration)
+		{
+			ERROR_HANDLER(MatrixSemanticError);
+		}
+		else
+		{
+			ERROR_HANDLER(ArgumentSizeMismatch, op_str, 
+				stype_left.cols, stype_right.cols);
+		}
+	}
+}
+
+// Make sure the name is available:
+void assert_available_name(const string str) {
+	if (symbol_table.count(str)) {
+		ERROR_HANDLER(RedefinedVariable,str);
+	}
+}
+
+// Make sure the variable name is declared already.
+void assert_declared(const string str) {
+	if (!symbol_table.count(str)) {
+		ERROR_HANDLER(UndefinedVariable,str);
+	}
+}
+
+// Make sure the value is positive
+void assert_positive(int value) {
+	if (value <= 0) {
+		ERROR_HANDLER(PositiveNumberExpected);
+	}
+}
+
+
+// Make sure the given argument is a positive constant (for matrix
+// definitions).
+void assert_matrix_arg(const YYSTYPE& stype) {
+	if (stype.is_matrix) {
+		ERROR_HANDLER(ScalarExpected);
+	}
+	else if (stype.value <= 0) {
+		ERROR_HANDLER(PositiveNumberExpected);
+	}
+	else if (!stype.is_int_const) {
+		ERROR_HANDLER(ConstantExpressionExpected);
+	}
+}
+
+// When dereferencing a matrix m[x,y], x (and y) must be non-negative
+// integers
+void assert_matrix_dereference_arg(const YYSTYPE& stype) {
+	if (stype.is_matrix) {
+		ERROR_HANDLER(ScalarExpected);
+	}
+}
+	
+// Use this in the construction of matrices using the [1,2;3,4] notation.
+// Input: two numbers, representing column sizes. Make sure they have the
+// same amount of columns.
+void assert_column_match(int col1, int col2) {
+	if (col1 != col2) {
+		ERROR_HANDLER(MatrixSemanticError);
+	}
+}
+	
+// Make sure the rows/columns are withing the bounds of the matrix.
+// Assumes the matrix has a valid name.
+void assert_in_bounds(const YYSTYPE& matrix, int row, int col) {
+	if (row >= matrix.rows || row < 0)
+		ERROR_HANDLER(IndexOutOfBounds, matrix.name, row);
+	if (col >= matrix.cols || col < 0)
+		ERROR_HANDLER(IndexOutOfBounds, matrix.name, col);
+}
+	
+// Make sure that the expression is not a matrix.
+void assert_scalar(const YYSTYPE& stype) {
+	if (stype.is_matrix) {
+		ERROR_HANDLER(ScalarExpected);
+	}
+}
+
+// Make sure that the expression is not a scalar.
+void assert_matrix(const YYSTYPE& stype) {
+	if (!stype.is_matrix) {
+		ERROR_HANDLER(MatrixExpected);
+	}
+}
+
+// void assert_matrix_and_scalar( 
+	// ArgumentType leftArg, ArgumentType rightArg, string op) {
+	// if ((leftArg != TypeMatrix) || (rightArg != TypeInt)) {
+		// ERROR_HANDLER(ArgumentTypeMismatch, op, leftArg, rightArg);
+	// }
+// }
+
+// Make sure we can multiply the to operands.
+// This only fails for matrices with bad dimensions.
+void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2, bool for_iteration) {
+	if (op1.is_matrix && op2.is_matrix && op1.cols != op2.rows)
+		if (for_iteration)
+			ERROR_HANDLER(ArgumentSizeMismatch, "^", op1.rows, op2.cols);
+		else
+			ERROR_HANDLER(ArgumentSizeMismatch, "*", op1.cols, op2.rows);
+}
+
+// Make sure we can concatenate two matrices.
+// Also makes sure they are matrices!
+void assert_concative(const YYSTYPE& op1, const YYSTYPE& op2) {
+	if (op1.rows != op2.rows)
+		ERROR_HANDLER(ArgumentSizeMismatch,"::",op1.rows,op2.rows);
+}
+
+void assert_non_zero(int num)
+{
+	if (num == 0)
+		ERROR_HANDLER(DivisionByZero);
+}
+
+void assert_matching_declaration_type(bool is_matrix_declaration_syntax)
+{
+	if (g_is_last_type_declaration_matrix and !is_matrix_declaration_syntax)
+		ERROR_HANDLER(MatrixSemanticError);
+	else if (!g_is_last_type_declaration_matrix and is_matrix_declaration_syntax)
+		ERROR_HANDLER(GeneralSemanticError);
+}
+	
+
+/*******************************
+		UTILITY FUNCTIONS
+*******************************/
+
+ArgumentType is_matrix_to_type(bool is_matrix)
+{
+	return is_matrix ? TypeMatrix : TypeInt;
+}
+
+// Prints out the contents of the given YYSTYPE, using the printing conventions defined.
+// DOES NOT print the name (doesn't print the "ID=\n" part), because some printed values have no
+// names.
+void print_stype(const YYSTYPE& stype) {
+	if (!stype.is_matrix) {
+		cout << stype.value << endl;
+	}
+	else {
+		for(int r=0; r<stype.rows; ++r) {
+			cout << stype.matrix[r][0];
+			for(int c=1; c<stype.cols; ++c)
+				cout << "," << stype.matrix[r][c];
+			cout << endl;
+		}
+	}
+}	
+
+void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const)
+{
+	stype.is_matrix = 0;
+	stype.is_int_const = is_int_const;
+	stype.value = value;
+	stype.name = name;
+}
+
+void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols,
+	const vector< vector<int> >& matrix) 
+{
+	stype.is_matrix = 1;
+	stype.rows = rows;
+	stype.cols = cols;
+	stype.matrix = matrix;
+	stype.name = name;
+}
+
+// Negate the value of the input, whether it's a scalar or matrix.
+// The values of is_int_const and is_matrix are copied.
+YYSTYPE negate(const YYSTYPE& stype) {
+	YYSTYPE negated = stype;
+	if (stype.is_matrix)
+		for (int i=0; i<stype.rows; ++i)
+			for (int j=0; j<stype.cols; ++j)
+				negated.matrix[i][j] = -stype.matrix[i][j];
+	else negated.value *= -1;
+	return negated;
+}
+
+// Add the two values (matrix or not).
+// Assume addition is allowed! Error handling should be done in the semantic analysis!
+// The value of is_matrix is copied, and the value of is_int_const is calculated.
+YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
+	YYSTYPE sum = op1;
+	if (op1.is_matrix)
+		for (int i=0; i<op1.rows; ++i)
+			for (int j=0; j<op1.cols; ++j)
+				sum.matrix[i][j] += op2.matrix[i][j];
+	else sum.value += op2.value;
+	return sum;
+}
+
+// Multiply the two variables.
+// This should work for any combination of operand types.
+// Calculates is_matrix and is_int_const, and the rows/columns if is_matrix=true.
+// ASSUMES MULTIPLICATION IS LEGAL!
+YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
+	YYSTYPE product;
+	product.is_matrix = (op1.is_matrix || op2.is_matrix);
+	if (op1.is_matrix && op2.is_matrix) {
+		// Matrix product! What fun!
+		// Set up the new matrix dimensions:
+		product.rows=op1.rows;
+		product.cols=op2.cols;
+		product.matrix.resize(product.rows, vector<int>(product.cols, 0));
+		// Calculate their values:
+		for (int row=0; row<product.rows; ++row)
+			for (int col=0; col<product.cols; ++col)
+				for (int i=0; i<op1.cols; ++i)
+					product.matrix[row][col] += op1.matrix[row][i]*op2.matrix[i][col];
+	}
+	else if (op1.is_matrix || op2.is_matrix) {
+		if (op1.is_matrix) {
+			product.matrix = op1.matrix;
+			product.rows = op1.rows;
+			product.cols = op1.cols;
+		}
+		else {
+			product.matrix = op2.matrix;
+			product.rows = op2.rows;
+			product.cols = op2.cols;
+		}
+		int multiplier = op1.is_matrix ? op2.value : op1.value;
+		for (int i=0; i<product.rows; ++i)
+			for (int j=0; j<product.cols; ++j)
+				product.matrix[i][j] *= multiplier;
+	}
+	else {
+		product.is_int_const = (op1.is_int_const && op2.is_int_const);
+		product.value = op1.value * op2.value;
+	}
+	return product;
+}
+
+YYSTYPE raise_matrix_to_power(const YYSTYPE& matrix_op, const YYSTYPE& exponent_op)
+{
+	YYSTYPE power;
+	
+	set_stype_to_matrix(power, "", 
+		matrix_op.rows, matrix_op.cols, 
+		matrix_op.matrix);
+	for (int i = 1; i < exponent_op.value; ++i) 
+	{
+		power = mul(power, matrix_op);
+	}
+	
+	return power;
+}
+
+YYSTYPE transpose(const YYSTYPE& matrix_op)
+{
+	YYSTYPE transposed;
+	set_stype_to_matrix(transposed, "", 
+		matrix_op.cols, matrix_op.rows, 
+		vector< vector<int> >());
+		
+	transposed.matrix.resize(transposed.rows, vector<int>(transposed.cols, 0));
+	for (int i = 0; i < matrix_op.rows; ++i)
+	{
+		for (int j = 0; j < matrix_op.cols; ++j)
+		{
+			transposed.matrix[j][i] = matrix_op.matrix[i][j];
+		}
+	}
+	
+	return transposed;
+}
+
+YYSTYPE concat(const YYSTYPE& op1, const YYSTYPE& op2)
+{
+	YYSTYPE result;
+	
+	set_stype_to_matrix(result, "", 
+		op1.rows, op1.cols + op2.cols,
+		op1.matrix);
+		
+	for (int i = 0; i < result.rows; ++i) 
+	{
+		result.matrix[i].resize(result.cols);
+		for (int j = 0; j < op2.cols; ++j)
+		{
+			result.matrix[i][op1.cols + j] = op2.matrix[i][j];
+		}
+	}
+	
+	return result;
+}
