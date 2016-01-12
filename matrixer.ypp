@@ -4,7 +4,6 @@
 	#include <set>
 	#include <vector>
 	#include <string>
-//	#include <unordered_map>	Not standard, use regular map instead
 	#include <map>
 	#include "attributes.h"
 	#include "printError.h"
@@ -13,7 +12,6 @@
 	using std::list;
 	using std::set;
 	using std::vector;
-//	using std::unordered_map;	Non-standard
 	using std::map;
 	/** TODO: Before submitting, set DEBUG to 0 (from attributes.h) */
 	#if DEBUG
@@ -27,14 +25,7 @@
 				GLOBALS
 	*******************************/
 	
-	// List of recently declared variable names.
-	// Updated primarily in InitIter rules, used to print out the
-	// values of all newly declared variables.
-	// After every Stmt, this list is reset (cleared).
-	list<string> declaration_list;
-	
 	// Map of symbols, linked to their data
-//	unordered_map<string,YYSTYPE> symbol_table;	Non-standard
 	map<string,YYSTYPE> symbol_table;
 		
 	/*******************************
@@ -101,11 +92,6 @@
 	*******************************/
 
 	ArgumentType is_matrix_to_type(bool is_matrix);
-	
-	// Prints out the contents of the given YYSTYPE, using the printing conventions defined.
-	// DOES NOT print the name (doesn't print the "ID=\n" part), because some printed values have no
-	// names.
-	void print_stype(const YYSTYPE& stype);
 	
 	void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const);
 
@@ -190,26 +176,10 @@ IterStmts		:	Stmt IterStmts {
 				;
 
 Stmt			:	TYPE Init InitIter SC {
-						// Enforce the types of the declared variables.
-						// Do this by iterating over the variables declared in
-						// InitIter (and in the first Init) and comparing their
-						// type to the TYPE token.
-						// Print all newly declared variables and their values,
-						// when done delete the declaration_list.
-						bool is_matrix = $1.is_matrix;
-						for (list<string>::iterator i=declaration_list.begin(); i!=declaration_list.end(); ++i) {
-							YYSTYPE stype = symbol_table[*i];
-							// if (stype.is_matrix != is_matrix)
-								// ERROR_HANDLER(GeneralSemanticError); // TODO: Specific error?
-							cout << stype.name << "=" << endl;
-							print_stype(stype);	
-						}
-						declaration_list.clear();
+						// No need to do anything here
 					}
 				|	Exp SC {
-						// If Exp is constant, print the value according to the data
-						// type.
-						print_stype($1);
+						// No need to do anything here
 					}
 				;
 
@@ -219,14 +189,11 @@ Init			:	ID {
 						// with the brackets: x[a,b]).
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table'), and if not - add it.
-						// Add the data to the list of newly declared variables
-						// declaration_list.
 						assert_matching_declaration_type(false);
 						
 						assert_available_name($1.name);
 						set_stype_to_int($$, $1.name, 0, false);
 						symbol_table[$$.name] = $$;
-						declaration_list.push_back($$.name);
 					}
 				|	ID ASSIGN Exp {
 						// Set type to integer, make sure Exp's type is the same.
@@ -235,8 +202,6 @@ Init			:	ID {
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table').
 						// Add the name to the symbol table.
-						// Add the data to the list of newly declared variables
-						// declaration_list.					
 						assert_matching_declaration_type(false);
 						
 						assert_available_name($1.name);
@@ -245,7 +210,6 @@ Init			:	ID {
 						set_stype_to_int($$, $1.name, $3.value, false);
 						
 						symbol_table[$$.name] = $$;
-						declaration_list.push_back($$.name);
 					}
 				|	ID LP Exp CS Exp RP {
 						// Make sure the expressions are positive (not non-
@@ -254,8 +218,6 @@ Init			:	ID {
 						// Make sure both Exp(s) are constant!
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table'), and if not - add it.
-						// Add the data to the list of newly declared variables
-						// declaration_list.
 						assert_matching_declaration_type(true);
 												
 						assert_matrix_arg($3);
@@ -267,7 +229,6 @@ Init			:	ID {
 							vector< vector<int> >());
 						$$.matrix.resize($$.rows, vector<int>($$.cols, 0));
 						symbol_table[$$.name] = $$;
-						declaration_list.push_back($$.name);
 					}
 				|	ID LP Exp CS Exp RP ASSIGN Exp {
 						// Several things need to be enforced here:
@@ -279,8 +240,6 @@ Init			:	ID {
 						// and make sure the first two Exp(s) are constant!
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table'), and if not - add it.
-						// Add the data to the list of newly declared variables
-						// declaration_list.
 						assert_matching_declaration_type(true);
 						
 						assert_matrix_arg($3);
@@ -293,7 +252,6 @@ Init			:	ID {
 						assert_matrices_of_same_dimensions($$, $8, "=", true);
 						
 						symbol_table[$$.name] = $$;
-						declaration_list.push_back($$.name);
 					}
 				;
 
@@ -777,23 +735,6 @@ ArgumentType is_matrix_to_type(bool is_matrix)
 {
 	return is_matrix ? TypeMatrix : TypeInt;
 }
-
-// Prints out the contents of the given YYSTYPE, using the printing conventions defined.
-// DOES NOT print the name (doesn't print the "ID=\n" part), because some printed values have no
-// names.
-void print_stype(const YYSTYPE& stype) {
-	if (!stype.is_matrix) {
-		cout << stype.value << endl;
-	}
-	else {
-		for(int r=0; r<stype.rows; ++r) {
-			cout << stype.matrix[r][0];
-			for(int c=1; c<stype.cols; ++c)
-				cout << "," << stype.matrix[r][c];
-			cout << endl;
-		}
-	}
-}	
 
 void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const)
 {
