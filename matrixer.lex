@@ -103,6 +103,26 @@ int|matrix				{
 							clear_unary_flag();
 							return ID;
 						}
+\<\=					{set_unary_flag(); return LEQ;}
+\>\=					{set_unary_flag(); return GEQ;}
+\<						{set_unary_flag(); return LESS;}
+\>						{set_unary_flag(); return GREATER;}
+\=\=					{set_unary_flag(); return EQ;}
+\!\=					{set_unary_flag(); return NEQ;}
+\&\&					{set_unary_flag(); return AND;}
+\|\|					{set_unary_flag(); return OR;}
+\!						{set_unary_flag(); return NOT;}
+print					{set_unary_flag(); return PRINT;}
+read					{set_unary_flag(); return READ;}
+\"[^"]*\"				{set_unary_flag(); return STRING;}
+true					{set_unary_flag(); return TRUE;}
+false					{set_unary_flag(); return FALSE;}
+if						{set_unary_flag(); return IF;}
+else					{set_unary_flag(); return ELSE;}
+while					{set_unary_flag(); return WHILE;}
+foreach					{set_unary_flag(); return FOREACH;}
+in						{set_unary_flag(); return IN;}
+
 
  /** Ignore comments */
 "//"[^\n]*\n			;

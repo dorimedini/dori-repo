@@ -2,4 +2,5 @@
 2. For scoping, do:
 	Stmt : LC M Stmt RC
    Where M adds a symbol table to the stack, and when reducing Stmt pop the symbol table
-   from the stack. 
+   from the stack.
+3. Associativity for boolean operators?
