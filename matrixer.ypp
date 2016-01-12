@@ -191,20 +191,25 @@ Stmt			:	TYPE Init InitIter SC {
 				|	READ ID SC {
 					
 					}
-				|	IF LP Bool RP Stmt {
+				|	IF LP Bool RP EnterScope SaveAddress Stmt {
 					
 					}
-				|	IF LP Bool RP Stmt ELSE Stmt {
+				|	IF LP Bool RP EnterScope SaveAddress Stmt PutGoto ELSE EnterScope SaveAddress Stmt {
 					
 					}
-				|	WHILE LP Bool RP Stmt {
+				|	WHILE SaveAddress LP Bool RP EnterScope SaveAddress Stmt {
+						
+					}
+				|	FOREACH EnterScope LP ID IN Exp RP SaveAddress Stmt {
 					
 					}
-				|	FOREACH LP ID IN Exp RP Stmt {
+				|	LC EnterScope Stmt IterStmts RC {
 					
 					}
-				|	LC Stmt IterStmts RC {
-					
+				;
+
+EnterScope		:	{
+	
 					}
 				;
 
