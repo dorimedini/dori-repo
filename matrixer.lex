@@ -123,7 +123,6 @@ while					{set_unary_flag(); return WHILE;}
 foreach					{set_unary_flag(); return FOREACH;}
 in						{set_unary_flag(); return IN;}
 
-
  /** Ignore comments */
 "//"[^\n]*\n			;
 
@@ -148,7 +147,5 @@ inline void clear_unary_flag() {
 
 void error_handler() 
 {
-	cout << "Invalid expression: ";
-	printError(LexicalError);
-	exit(LexicalError);
+	cout << "LEXICAL ERROR" << endl;
 }
