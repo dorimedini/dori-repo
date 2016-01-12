@@ -38,6 +38,12 @@
 	map<string,YYSTYPE> symbol_table;
 		
 	/*******************************
+			ERROR HANDLERS
+	*******************************/
+
+	void semantic_error();
+	
+	/*******************************
 		  SEMANTIC VALIDATORS
 	*******************************/
 	
@@ -79,9 +85,8 @@
 	void assert_matrix(const YYSTYPE& stype);
 
 	// Make sure we can multiply the two operands.
-	// This test is also used to test for matrix iteration, so add an extra flag so we know the type
-	// of error to report.
-	void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2, bool for_iteration);
+	// This test is also used to test for matrix iteration.
+	void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2);
 	
 	// Make sure we can concatenate two matrices.
 	// Also makes sure they are matrices!
@@ -334,7 +339,7 @@ Exp				:	Exp PLUS Exp {
 						// is_int_const fields of the two right-side Exps.
 						DO_DEBUG(cout << "multiplying... ");
 						assert_type_match($1,$3,'*');	// This should always be OK...
-						assert_multiplicative($1,$3,false);
+						assert_multiplicative($1,$3);
 						$$ = mul($1,$3);
 						DO_DEBUG(cout << "multiplied" << endl);
 					}
@@ -412,15 +417,6 @@ Exp				:	Exp PLUS Exp {
 					}
 				;
 
-/** Before removing Mat:ID (this caused the grammar to be ambiguous):
-Mat				:	LB Exp MatFirstIter MatSecondIter RB
-				|	ID
-				|	Mat CONCAT Mat
-				|	Mat ITERATION LP Exp RP %prec ITERATION
-				|	TRANSPOSE LP Mat RP
-				;*/
-
-/** After removal: */
 Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 						// Make sure the number of columns created in MatFirstIter
 						// (which is the iteration for the first row of numbers) is
@@ -507,7 +503,7 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 						assert_type_match($1, $4, '^');
 						assert_positive($4.value);
 						
-						assert_multiplicative($$, $$, true);
+						assert_multiplicative($$, $$);
 						
 						$$ = raise_matrix_to_power($1, $4);
 					}
@@ -523,7 +519,7 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 						
 						assert_positive($4.value);
 						
-						assert_multiplicative(stype, stype, true);
+						assert_multiplicative(stype, stype);
 						
 						$$ = raise_matrix_to_power(stype, $4);
 					}
@@ -624,8 +620,17 @@ int main() {
 }
 
 int yyerror(char const* message) {
-	ERROR_HANDLER(SyntaxError);
+	cout << "SYNTACTIC ERROR" << endl;
 }
+
+/*******************************
+		ERROR HANDLERS
+*******************************/
+
+void semantic_error() {
+	cout << "SEMANTIC ERROR" << endl;
+}
+	
 
 /*******************************
 	  SEMANTIC VALIDATORS
@@ -653,7 +658,7 @@ void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, ch
 			break;
 	}
 	if (mismatch) {
-		ERROR_HANDLER(ArgumentTypeMismatch, op_str, left_type, right_type);
+		semantic_error();
 	}
 }
 
@@ -661,52 +666,30 @@ void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, ch
 void assert_matrices_of_same_dimensions(
 	const YYSTYPE& stype_left, const YYSTYPE& stype_right, 
 	const string op_str, bool is_matrix_declaration) {
-	if ((!stype_left.is_matrix) || (!stype_right.is_matrix)) {
-		ERROR_HANDLER(MatrixExpected);
-	}
-	if (stype_left.rows != stype_right.rows) {
-		if (is_matrix_declaration)
-		{
-			ERROR_HANDLER(MatrixSemanticError);
-		}
-		else
-		{
-			ERROR_HANDLER(ArgumentSizeMismatch, op_str,
-				stype_left.rows, stype_right.rows);
-
-		}
-	}
-	if (stype_left.cols != stype_right.cols) {
-		if (is_matrix_declaration)
-		{
-			ERROR_HANDLER(MatrixSemanticError);
-		}
-		else
-		{
-			ERROR_HANDLER(ArgumentSizeMismatch, op_str, 
-				stype_left.cols, stype_right.cols);
-		}
+	if ((!stype_left.is_matrix) || (!stype_right.is_matrix)
+		|| stype_left.rows != stype_right.rows || stype_left.cols != stype_right.cols) {
+		semantic_error();
 	}
 }
 
 // Make sure the name is available:
 void assert_available_name(const string str) {
 	if (symbol_table.count(str)) {
-		ERROR_HANDLER(RedefinedVariable,str);
+		semantic_error();
 	}
 }
 
 // Make sure the variable name is declared already.
 void assert_declared(const string str) {
 	if (!symbol_table.count(str)) {
-		ERROR_HANDLER(UndefinedVariable,str);
+		semantic_error();
 	}
 }
 
 // Make sure the value is positive
 void assert_positive(int value) {
 	if (value <= 0) {
-		ERROR_HANDLER(PositiveNumberExpected);
+		semantic_error();
 	}
 }
 
@@ -714,14 +697,8 @@ void assert_positive(int value) {
 // Make sure the given argument is a positive constant (for matrix
 // definitions).
 void assert_matrix_arg(const YYSTYPE& stype) {
-	if (stype.is_matrix) {
-		ERROR_HANDLER(ScalarExpected);
-	}
-	else if (stype.value <= 0) {
-		ERROR_HANDLER(PositiveNumberExpected);
-	}
-	else if (!stype.is_int_const) {
-		ERROR_HANDLER(ConstantExpressionExpected);
+	if (stype.is_matrix || stype.value <= 0 || !stype.is_int_const) {
+		semantic_error();
 	}
 }
 
@@ -729,7 +706,7 @@ void assert_matrix_arg(const YYSTYPE& stype) {
 // integers
 void assert_matrix_dereference_arg(const YYSTYPE& stype) {
 	if (stype.is_matrix) {
-		ERROR_HANDLER(ScalarExpected);
+		semantic_error();
 	}
 }
 	
@@ -738,69 +715,57 @@ void assert_matrix_dereference_arg(const YYSTYPE& stype) {
 // same amount of columns.
 void assert_column_match(int col1, int col2) {
 	if (col1 != col2) {
-		ERROR_HANDLER(MatrixSemanticError);
+		semantic_error();
 	}
 }
 	
 // Make sure the rows/columns are withing the bounds of the matrix.
 // Assumes the matrix has a valid name.
 void assert_in_bounds(const YYSTYPE& matrix, int row, int col) {
-	if (row >= matrix.rows || row < 0)
-		ERROR_HANDLER(IndexOutOfBounds, matrix.name, row);
-	if (col >= matrix.cols || col < 0)
-		ERROR_HANDLER(IndexOutOfBounds, matrix.name, col);
+	if (row >= matrix.rows || row < 0 || col >= matrix.cols || col < 0)
+		semantic_error();
 }
 	
 // Make sure that the expression is not a matrix.
 void assert_scalar(const YYSTYPE& stype) {
 	if (stype.is_matrix) {
-		ERROR_HANDLER(ScalarExpected);
+		semantic_error();
 	}
 }
 
 // Make sure that the expression is not a scalar.
 void assert_matrix(const YYSTYPE& stype) {
 	if (!stype.is_matrix) {
-		ERROR_HANDLER(MatrixExpected);
+		semantic_error();
 	}
 }
 
-// void assert_matrix_and_scalar( 
-	// ArgumentType leftArg, ArgumentType rightArg, string op) {
-	// if ((leftArg != TypeMatrix) || (rightArg != TypeInt)) {
-		// ERROR_HANDLER(ArgumentTypeMismatch, op, leftArg, rightArg);
-	// }
-// }
-
 // Make sure we can multiply the to operands.
 // This only fails for matrices with bad dimensions.
-void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2, bool for_iteration) {
+void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2) {
 	if (op1.is_matrix && op2.is_matrix && op1.cols != op2.rows)
-		if (for_iteration)
-			ERROR_HANDLER(ArgumentSizeMismatch, "^", op1.rows, op2.cols);
-		else
-			ERROR_HANDLER(ArgumentSizeMismatch, "*", op1.cols, op2.rows);
+		semantic_error();
 }
 
 // Make sure we can concatenate two matrices.
 // Also makes sure they are matrices!
 void assert_concative(const YYSTYPE& op1, const YYSTYPE& op2) {
 	if (op1.rows != op2.rows)
-		ERROR_HANDLER(ArgumentSizeMismatch,"::",op1.rows,op2.rows);
+		semantic_error();
 }
 
 void assert_non_zero(int num)
 {
 	if (num == 0)
-		ERROR_HANDLER(DivisionByZero);
+		semantic_error();
 }
 
 void assert_matching_declaration_type(bool is_matrix_declaration_syntax)
 {
-	if (g_is_last_type_declaration_matrix and !is_matrix_declaration_syntax)
-		ERROR_HANDLER(MatrixSemanticError);
-	else if (!g_is_last_type_declaration_matrix and is_matrix_declaration_syntax)
-		ERROR_HANDLER(GeneralSemanticError);
+	if (g_is_last_type_declaration_matrix && !is_matrix_declaration_syntax)
+		semantic_error();
+	else if (!g_is_last_type_declaration_matrix && is_matrix_declaration_syntax)
+		semantic_error();
 }
 	
 
