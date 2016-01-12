@@ -31,7 +31,8 @@
 	/*******************************
 			ERROR HANDLERS
 	*******************************/
-
+	
+	// General use error handler for semantic errors
 	void semantic_error();
 	
 	/*******************************
@@ -162,24 +163,41 @@
 	*******************************/
 
  // To simulate BNF iteration, use XIter variables for every X with iterations.
-Stmts			:	Stmt IterStmts {
-						// Nothing to do here.
+
+Stmt			:	TYPE Init InitIter SC {
+						
+					}
+				|	Lvalue ASSIGN Exp SC {
+						
+					}
+				|	PRINT OutputSpecifier SC {
+						
+					}
+				|	READ ID SC {
+					
+					}
+				|	IF LP Bool RP Stmt {
+					
+					}
+				|	IF LP Bool RP Stmt ELSE Stmt {
+					
+					}
+				|	WHILE LP Bool RP Stmt {
+					
+					}
+				|	FOREACH LP ID IN Exp RP Stmt {
+					
+					}
+				|	LC Stmt IterStmts RC {
+					
 					}
 				;
 
 IterStmts		:	Stmt IterStmts {
-						// Nothing to do here.
+						
 					}
 				|	{
-						// Nothing to do here.
-					}
-				;
-
-Stmt			:	TYPE Init InitIter SC {
-						// No need to do anything here
-					}
-				|	Exp SC {
-						// No need to do anything here
+						
 					}
 				;
 
@@ -256,10 +274,10 @@ Init			:	ID {
 				;
 
 InitIter		:	CS Init InitIter {
-						// No need to do anything special in these iterations.
+						
 					}
 				|	{
-						// No need to do anything special in these iterations.
+						
 					}
 				;
 
@@ -404,88 +422,11 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 							$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
 						}
 					}
-				|	Mat CONCAT Mat {
-						// Make sure both are matrices 
-						// and have the same number of rows.
-						DO_DEBUG(cout << "concatenating... ");
-						assert_type_match($1, $3, ':');
-						assert_concative($1,$3);
-						
-						$$ = concat($1, $3);
-						DO_DEBUG(cout << "concatenated" << endl);
-					}
-				|	ID CONCAT Mat {
-						// Make sure the ID is of a matrix with the same number of
-						// rows as 'Mat' (and is declared)
-						assert_declared($1.name);
-						// Get the data
-						YYSTYPE stype = symbol_table[$1.name];
-						assert_type_match(stype, $3, ':');
-						assert_concative(stype,$3);//TODOGALY: change to ArgumentTypeMismatch??
-						
-						$$ = concat(stype, $3);
-					}
-				 // Set %prec here to make sure concatenation stays associative.
-				 // ID doesn't have priority, so we need to make sure this is solved
-				 // using associativity:
-				|	Mat CONCAT ID %prec CONCAT {
-						// Make sure the ID is of a matrix with the same number of
-						// rows as 'Mat' and is declared.
-						assert_declared($3.name);
-						// Get the data, validate it
-						YYSTYPE stype = symbol_table[$3.name];
-						assert_type_match($1, stype, ':');
-						assert_concative($1,stype);
-						
-						$$ = concat($1, stype);
-					}
-				|	ID CONCAT ID %prec CONCAT {
-						// Make sure both IDs exist and are matrices with the same
-						// amount of rows, and are declared.
-						assert_declared($1.name);
-						assert_declared($3.name);
-						// Get the data
-						YYSTYPE stype1 = symbol_table[$1.name];
-						YYSTYPE stype2 = symbol_table[$3.name];
-						// Validate it
-						assert_type_match(stype1, stype2, ':');
-						assert_concative(stype1,stype2);
-						
-						// Concatenate
-						$$ = concat(stype1, stype2);
-					}
-				 // Set %prec here to prefer iteration over concatenation:
-				|	Mat ITERATION LP Exp RP %prec ITERATION {
-						// Loop for Exp times (make sure Exp is a non-negative
-						// number, and that Mat is square).
-						assert_type_match($1, $4, '^');
-						assert_positive($4.value);
-						
-						assert_multiplicative($$, $$);
-						
-						$$ = raise_matrix_to_power($1, $4);
-					}
-				|	ID ITERATION LP Exp RP %prec ITERATION {
-						// Same as above, and in addition:
-						// Make sure ID is declared.
-						// Check if ID is a matrix.
-						assert_declared($1.name);
-						// Get the data
-						YYSTYPE stype = symbol_table[$1.name];
-						// Validate
-						assert_type_match(stype, $4, '^');
-						
-						assert_positive($4.value);
-						
-						assert_multiplicative(stype, stype);
-						
-						$$ = raise_matrix_to_power(stype, $4);
-					}
-				|	TRANSPOSE LP Mat RP {
+				|	TRANSPOSE LC Mat RC {
 						// Transpose.
 						$$ = transpose($3);
 					}
-				|	TRANSPOSE LP ID RP {
+				|	TRANSPOSE LC ID RC {
 						// Check if ID is declared and a matrix, and transpose.
 						assert_declared($3.name);
 						// Get the data
@@ -565,6 +506,63 @@ MatSecondIter	:	SC Exp MatFirstIter MatSecondIter {
 					}
 				;
 
+Lvalue			:	ID {
+					
+					}
+				|	ID LB Exp CS Exp RB {
+					
+					}
+				;
+				
+Bool			:	Exp LEQ Exp {
+						
+					}
+				|	Exp GEQ Exp {
+					
+					}
+				|	Exp LESS Exp {
+					
+					}
+				|	Exp GREATER Exp {
+					
+					}
+				|	Exp EQ Exp {
+					
+					}
+				|	Exp NEQ Exp {
+					
+					}
+				|	Exp IN Exp {
+					
+					}
+				|	NOT Bool {
+					
+					}
+				|	Bool AND Bool {
+					
+					}
+				|	Bool OR Bool {
+					
+					}
+				|	LP Bool RP {
+					
+					}
+				|	TRUE {
+					
+					}
+				|	FALSE {
+					
+					}
+				;
+				
+OutputSpecifier :	ID {
+					
+					}
+				|	STRING {
+					
+					}
+				;
+				
 %%
 
 /*******************************
