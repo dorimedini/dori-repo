@@ -1,1 +1,5 @@
 1. ELSE needs to have higher priority than the IF rule, to solve ambiguity?
+2. For scoping, do:
+	Stmt : LC M Stmt RC
+   Where M adds a symbol table to the stack, and when reducing Stmt pop the symbol table
+   from the stack. 
