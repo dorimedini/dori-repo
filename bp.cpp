@@ -47,7 +47,7 @@ int newTemp() {
 	return sp++;
 }
 
-void popStack(int x) {
+void pop_stack(int x) {
 	sp -= x;
 }
 

@@ -1,7 +1,6 @@
 %{
 #include <stdio.h>
 #include <string>
-#include "printError.h"
 #include "attributes.h"
 #include "matrixer.tab.hpp"
 using std::string;
@@ -128,7 +127,7 @@ in						{set_unary_flag(); return IN;}
 [\t\n\r ]*				;
 
  /** Error - no character match */
-.						ERROR_HANDLER(LexicalError);
+.						error_handler();
 
 
 %%
