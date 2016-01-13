@@ -5,6 +5,7 @@
 using namespace std;
 
 vector<string> buffer;
+int sp = 0;
 
 int next(){
     return buffer.size();    
@@ -40,5 +41,13 @@ list<int> merge(list<int> l1,list<int> l2)
 	newList.merge(l1);
 	newList.merge(l2);
 	return newList;
+}
+
+int newTemp() {
+	return sp++;
+}
+
+void popStack(int x) {
+	sp -= x;
 }
 

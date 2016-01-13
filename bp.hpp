@@ -36,8 +36,14 @@ void bp(list<int>& l, int address);
 void printBuffer();
 /*
  * 	 New temp
+ *	 Returns the stack pointer and increments it
  * 	 */
-string newTemp();
+int newTemp();
+/*
+ *    Pop stack
+ *    Deducts x from the stack pointer to free up memory
+ */
+void popStack(int x);
 list<int> makelist(int litem);
 list<int> merge(list<int> l1,list<int> l2);
 #endif
