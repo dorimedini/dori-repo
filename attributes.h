@@ -26,17 +26,6 @@ using std::cout;
 using std::endl;
 	
 /*******************************
-			MACROS
-*******************************/
-
-// Error handler
-// TODO: Is printing "Invalid expression: " required?
-#define ERROR_HANDLER(code, ...) do { \
-	printError(code, ##__VA_ARGS__); \
-	exit(code); \
-} while(0)
-
-/*******************************
 			DECLARATIONS
 *******************************/
 extern bool g_is_last_type_declaration_matrix;
