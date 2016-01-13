@@ -37,10 +37,15 @@ extern bool g_is_last_type_declaration_matrix;
 // token is (we don't care if an LP token is constant or not).
 typedef struct {
 	bool is_matrix, is_int_const;
-	int value;
+	int value;	// Still need this, to calculate constant values for matrix dimensions
 	vector< vector<int> > matrix;
-	int rows, cols;
+	int rows, cols;	// Need these (for matrix dimensions, obviously)
 	string name;
+	int stack_offset;	// For use in the symbol table, to find s[i]'s index
+	
+	// Not in use in the symbol table (nodes only):
+	list<int> next_list, true_list, false_list;
+	int buffer_offset;	// For use with SaveAddress
 } STYPE;
 
 #define YYSTYPE STYPE	// Tell Bison to use STYPE as the stack type

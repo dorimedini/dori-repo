@@ -6,7 +6,7 @@
 	#include <string>
 	#include <map>
 	#include "attributes.h"
-	#include "printError.h"
+	#include "bp.hpp"
 	using std::cout;
 	using std::endl;
 	using std::list;
@@ -25,11 +25,9 @@
 				GLOBALS
 	*******************************/
 	
-	// Map of symbols, linked to their data
-	map<string,YYSTYPE> symbol_table;
-	
-	// Top of the program stack
-	int sp;
+	// Map of symbols, linked to their data.
+	// Listed by scope.
+	list< map<string,YYSTYPE> > symbol_table;
 		
 	/*******************************
 			ERROR HANDLERS
@@ -52,7 +50,8 @@
 	void assert_available_name(const string str);
 	
 	// Make sure the variable name is declared already.
-	void assert_declared(const string str);
+	// If it is, returns a pointer to the STYPE in the symbol table (for reading / editing)
+	YYSTYPE* assert_declared_and_fetch(const string str);
 	
 	// Make sure the value is positive
 	void assert_positive(int value);
@@ -120,6 +119,10 @@
 		const YYSTYPE& exponent_op);
 	YYSTYPE transpose(const YYSTYPE& op);
 	YYSTYPE concat(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+	// Takes care of scope cleanup.
+	// Pops one element of the symbol table and frees up it's memory
+	void exit_scope();
 	
 %}
 
@@ -231,7 +234,8 @@ PutGoto			:	{
 				;
 
 EnterScope		:	{
-	
+						// Add a new scope
+						symbol_table.push_back(map<string,YYSTYPE>());
 					}
 				;
 
@@ -253,7 +257,7 @@ Init			:	ID {
 						
 						assert_available_name($1.name);
 						set_stype_to_int($$, $1.name, 0, false);
-						symbol_table[$$.name] = $$;
+						symbol_table.back()[$$.name] = $$;
 					}
 				|	ID ASSIGN Exp {
 						// Set type to integer, make sure Exp's type is the same.
@@ -269,7 +273,7 @@ Init			:	ID {
 						
 						set_stype_to_int($$, $1.name, $3.value, false);
 						
-						symbol_table[$$.name] = $$;
+						symbol_table.back()[$$.name] = $$;
 					}
 				|	ID LP Exp CS Exp RP {
 						// Make sure the expressions are positive (not non-
@@ -288,7 +292,7 @@ Init			:	ID {
 							$3.value, $5.value,
 							vector< vector<int> >());
 						$$.matrix.resize($$.rows, vector<int>($$.cols, 0));
-						symbol_table[$$.name] = $$;
+						symbol_table.back()[$$.name] = $$;
 					}
 				|	ID LP Exp CS Exp RP ASSIGN Exp {
 						// Several things need to be enforced here:
@@ -311,7 +315,7 @@ Init			:	ID {
 						
 						assert_matrices_of_same_dimensions($$, $8, "=", true);
 						
-						symbol_table[$$.name] = $$;
+						symbol_table.back()[$$.name] = $$;
 					}
 				;
 
@@ -395,9 +399,8 @@ Exp				:	Exp PLUS Exp {
 				|	ID {
 						// All IDs have values, types etc. Copy them, and set
 						// Exp to non-constant. Make sure ID.name has been declared!
-						assert_declared($1.name);
 						// Let Exp equal the value of the symbol, using the symbol table.
-						$$ = symbol_table[$1.name];
+						$$ = assert_declared_and_fetch($1.name);
 						DO_DEBUG(if ($$.is_int_const != false) cout << 
 							"ERROR: ID's is_int_const is not set to false!" << endl;);
 					}
@@ -418,9 +421,7 @@ Exp				:	Exp PLUS Exp {
 						// Set the left Exp's is_int_const field to 0 (no way to write [1,2;3,4][1,1] - 
 						// cannot dereference a constant matrix).
 						// TODO: Is this legal: [1,2;3,4][1,0]? Should evaluate to 3?
-						assert_declared($1.name);
-						// Get the data from the symbol table
-						YYSTYPE stype = symbol_table[$1.name];
+						YYSTYPE stype = assert_declared_and_fetch($1.name);
 						// Make sure this is a matrix...
 						assert_matrix(stype);
 						// From the PDF, page 3:
@@ -470,9 +471,7 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 					}
 				|	TRANSPOSE LC ID RC {
 						// Check if ID is declared and a matrix, and transpose.
-						assert_declared($3.name);
-						// Get the data
-						YYSTYPE stype = symbol_table[$3.name];
+						YYSTYPE stype = assert_declared_and_fetch($3.name);
 						assert_matrix(stype);
 						$$ = transpose(stype);
 					}
@@ -672,18 +671,25 @@ void assert_matrices_of_same_dimensions(
 	}
 }
 
-// Make sure the name is available:
+// Make sure the name is available in the most recent scope:
 void assert_available_name(const string str) {
-	if (symbol_table.count(str)) {
+	if (symbol_table.back().count(str)) {
 		semantic_error();
 	}
 }
 
-// Make sure the variable name is declared already.
-void assert_declared(const string str) {
-	if (!symbol_table.count(str)) {
-		semantic_error();
+// Make sure the variable name is declared already,
+// in some encapsulating scope.
+// If it exists, return a pointer to it.
+YYSTYPE* assert_declared_and_fetch(const string str) {
+	for (list< map<string,YYSTYPE> >::reverse_iterator i=symbol_table.rbegin();
+				i!=symbol_table.rend();
+				++i) {
+		if (i->count(str)) {
+			return &((*i)[str]);
+		}
 	}
+	semantic_error();
 }
 
 // Make sure the value is positive
@@ -916,3 +922,19 @@ YYSTYPE concat(const YYSTYPE& op1, const YYSTYPE& op2)
 	
 	return result;
 }
+
+// Takes care of scope cleanup.
+// Pops one element of the symbol table and frees up it's memory
+void exit_scope() {
+	map<string,YYSTYPE> dead_scope = symbol_table.back();
+	for (map<string,YYSTYPE>::iterator i = dead_scope.begin(); i!=dead_scope.end(); ++i) {
+		if (i->is_matrix) {
+			pop_stack(i->rows * i->cols);
+		}
+		else pop_stack(1);
+	}
+	symbol_table.pop_back();
+}
+
+
+
