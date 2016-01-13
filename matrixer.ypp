@@ -463,11 +463,11 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 							$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
 						}
 					}
-				|	TRANSPOSE LC Mat RC {
+				|	TRANSPOSE LP Mat RP {
 						// Transpose.
 						$$ = transpose($3);
 					}
-				|	TRANSPOSE LC ID RC {
+				|	TRANSPOSE LP ID RP {
 						// Check if ID is declared and a matrix, and transpose.
 						YYSTYPE stype = assert_declared_and_fetch($3.name);
 						assert_matrix(stype);
