@@ -146,4 +146,5 @@ inline void clear_unary_flag() {
 void error_handler() 
 {
 	cout << "LEXICAL ERROR" << endl;
+	exit(0);
 }
