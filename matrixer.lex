@@ -62,8 +62,6 @@ void error_handler();
 \,						{set_unary_flag(); return CS;}
 \;						{set_unary_flag(); return SC;}
 \=						{set_unary_flag(); return ASSIGN;}
-"::"					{set_unary_flag(); return CONCAT;}
-\^						{clear_unary_flag(); return ITERATION;}
 transpose				{clear_unary_flag(); return TRANSPOSE;}
 int|matrix				{
 	// TODO: Aren't the true and false here switched?:
