@@ -1,4 +1,4 @@
-all: ex4.exe
+all: ex5.exe
 
 matrixer.tab.cpp matrixer.tab.hpp:	matrixer.ypp
 	bison -d matrixer.ypp
@@ -12,8 +12,8 @@ attributes.o:	attributes.h attributes.cpp
 lex.yy.c: matrixer.lex matrixer.tab.hpp bp.o attributes.o
 	flex matrixer.lex
 
-ex4.exe: lex.yy.c matrixer.tab.cpp matrixer.tab.hpp bp.hpp
-	g++ -g -o ex4.exe matrixer.tab.cpp lex.yy.c bp.o attributes.o
+ex5.exe: lex.yy.c matrixer.tab.cpp matrixer.tab.hpp bp.hpp
+	g++ -g -o ex5.exe matrixer.tab.cpp lex.yy.c bp.o attributes.o
 
 clean:
 	rm -f matrixer matrixer.tab.cpp lex.yy.c matrixer.tab.hpp bp.o attributes.o

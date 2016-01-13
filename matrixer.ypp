@@ -121,6 +121,11 @@
 	// Takes care of scope cleanup.
 	// Pops one element of the symbol table and frees up it's memory
 	void exit_scope();
+	void handle_matrix_dereference(
+		YYSTYPE& target_stype,
+		string matrix_name,
+		const YYSTYPE& row_stype,
+		const YYSTYPE& col_stype);
 	
 %}
 
@@ -186,7 +191,7 @@ Stmt			:	TYPE Init InitIter SC {
 						
 					}
 				|	Lvalue ASSIGN Exp SC {
-						
+						assert_type_match($1, $3, '=');
 					}
 				|	PRINT OutputSpecifier SC {
 						
@@ -410,27 +415,7 @@ Exp				:	Exp PLUS Exp {
 						$$ = $2;
 					}
 				|	ID LB Exp CS Exp RB {
-						// This is dereferencing a matrix slot.
-						// Make sure ID is a matrix, both expressions are non-negative numbers
-						// and that they are within the bounds of the rows/columns
-						// of the matrix.
-						// Make sure ID has been declared, and that both Exps on the right are
-						// valid matrix arguments (constant and positive).
-						// Set the left Exp's is_int_const field to 0 (no way to write [1,2;3,4][1,1] - 
-						// cannot dereference a constant matrix).
-						// TODO: Is this legal: [1,2;3,4][1,0]? Should evaluate to 3?
-						YYSTYPE stype = assert_declared_and_fetch($1.name);
-						// Make sure this is a matrix...
-						assert_matrix(stype);
-						// From the PDF, page 3:
-						// "When dereferencing a cell in a matrix, both numbers must be non-negative
-						// constant integers". So, they must be like the argument arg1,arg2 in
-						// statements like matrix m(arg1,arg2):
-						assert_matrix_dereference_arg($3);
-						assert_matrix_dereference_arg($5);
-						
-						assert_in_bounds(stype,$3.value,$5.value);
-						set_stype_to_int($$, "", stype.matrix[$3.value][$5.value], false);
+						handle_matrix_dereference($$, $1.name, $3, $5);
 					}
 				;
 
@@ -546,10 +531,10 @@ MatSecondIter	:	SC Exp MatFirstIter MatSecondIter {
 				;
 
 Lvalue			:	ID {
-					
+						$$ = assert_declared_and_fetch($1.name);
 					}
 				|	ID LB Exp CS Exp RB {
-					
+						handle_matrix_dereference($$, $1.name, $3, $5);
 					}
 				;
 				
@@ -650,6 +635,9 @@ void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, ch
 			break;
 		case '/':
 			mismatch = (stype_left.is_matrix || stype_right.is_matrix);
+			break;
+		case '=':
+			mismatch = (stype_left.is_matrix != stype_right.is_matrix);
 			break;
 	}
 	if (mismatch) {
@@ -927,5 +915,30 @@ void exit_scope() {
 	symbol_table.pop_back();
 }
 
+void handle_matrix_dereference(
+	YYSTYPE& target_stype,
+	string matrix_name, 
+	const YYSTYPE& row_stype, 
+	const YYSTYPE& col_stype) {
+	// This is dereferencing a matrix slot.
+	// Make sure ID is a matrix, both expressions are non-negative numbers
+	// and that they are within the bounds of the rows/columns
+	// of the matrix.
+	// Make sure ID has been declared, and that both Exps on the right are
+	// valid matrix arguments (constant and positive).
+	// Set the left Exp's is_int_const field to 0 (no way to write [1,2;3,4][1,1] - 
+	// cannot dereference a constant matrix).
+	// TODO: Is this legal: [1,2;3,4][1,0]? Should evaluate to 3?
+	YYSTYPE matrix_stype = assert_declared_and_fetch(matrix_name);
+	// Make sure this is a matrix...
+	assert_matrix(matrix_stype);
+	// From the PDF, page 3:
+	// "When dereferencing a cell in a matrix, both numbers must be non-negative
+	// constant integers". So, they must be like the argument arg1,arg2 in
+	// statements like matrix m(arg1,arg2):
+	assert_matrix_dereference_arg(row_stype);
+	assert_matrix_dereference_arg(col_stype);
 
-
+	assert_in_bounds(matrix_stype, row_stype.value, col_stype.value);
+	set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
+}
