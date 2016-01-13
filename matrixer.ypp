@@ -707,7 +707,7 @@ void assert_matrix_arg(const YYSTYPE& stype) {
 // When dereferencing a matrix m[x,y], x (and y) must be non-negative
 // integers
 void assert_matrix_dereference_arg(const YYSTYPE& stype) {
-	if (stype.is_matrix) {
+	if (stype.is_matrix || !stype.is_int_const) {
 		semantic_error();
 	}
 }

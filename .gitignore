@@ -1,1 +1,7 @@
 *.output
+*.opensdf
+dori-repo.sln
+*.sdf
+dori-repo.v12.suo
+*.vcxproj
+dori-repo.vcxproj.filters
