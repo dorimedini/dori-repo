@@ -619,6 +619,7 @@ int main() {
 
 int yyerror(char const* message) {
 	cout << "SYNTACTIC ERROR" << endl;
+	exit(0);
 }
 
 /*******************************
@@ -627,6 +628,7 @@ int yyerror(char const* message) {
 
 void semantic_error() {
 	cout << "SEMANTIC ERROR" << endl;
+	exit(0);
 }
 	
 
