@@ -50,6 +50,17 @@ void error_handler();
 
 %%
 
+print					{set_unary_flag(); return PRINT;}
+read					{set_unary_flag(); return READ;}
+\"[^"]*\"				{set_unary_flag(); return STRING;}
+true					{set_unary_flag(); return TRUE;}
+false					{set_unary_flag(); return FALSE;}
+if						{set_unary_flag(); return IF;}
+else					{set_unary_flag(); return ELSE;}
+while					{set_unary_flag(); return WHILE;}
+foreach					{set_unary_flag(); return FOREACH;}
+in						{set_unary_flag(); return IN;}
+
  /** These are pretty straightforward, except for the minus sign. */
  /** See above for more detailed comments on the unary minus. */
 \(						{set_unary_flag(); return LP;}
@@ -109,16 +120,6 @@ int|matrix				{
 \&\&					{set_unary_flag(); return AND;}
 \|\|					{set_unary_flag(); return OR;}
 \!						{set_unary_flag(); return NOT;}
-print					{set_unary_flag(); return PRINT;}
-read					{set_unary_flag(); return READ;}
-\"[^"]*\"				{set_unary_flag(); return STRING;}
-true					{set_unary_flag(); return TRUE;}
-false					{set_unary_flag(); return FALSE;}
-if						{set_unary_flag(); return IF;}
-else					{set_unary_flag(); return ELSE;}
-while					{set_unary_flag(); return WHILE;}
-foreach					{set_unary_flag(); return FOREACH;}
-in						{set_unary_flag(); return IN;}
 
  /** Ignore comments */
 "//"[^\n]*\n			;
