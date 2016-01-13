@@ -27,6 +27,9 @@
 	
 	// Map of symbols, linked to their data
 	map<string,YYSTYPE> symbol_table;
+	
+	// Top of the program stack
+	int sp;
 		
 	/*******************************
 			ERROR HANDLERS
@@ -127,7 +130,7 @@
 	*******************************/
 
 %token LP RP LC RC LB RB SC TYPE ID NUM
-%token LEQ GEQ LESS GREATER EQ NEQ NOT PRINT READ STRING TRUE FALSE WHILE FOREACH
+%token LEQ GEQ LESS GREATER EQ NEQ PRINT READ STRING TRUE FALSE WHILE FOREACH
  // Assignment is right-associative: a=b=c ==> a=(b=c)
 %right ASSIGN
  // The comma sign needs to be associative: int a,b,c ==> int (a,b),c
@@ -143,6 +146,8 @@
  // evaluate (a OR b AND c)==(a OR (b AND c)) 
 %left OR
 %left AND
+ // Make NOT stronger than both of the above:
+%nonassoc NOT
  // The IN token needs lower priority than arithmetic operators, so we can do
  // something like "2 IN [1]+[1]" (should evaluate to TRUE).
 %nonassoc IN
@@ -158,14 +163,6 @@
 %left MINUS PLUS
 %left MUL DIV
 %nonassoc UNARY_MINUS
- // Associativity of CONCAT is needed. Make sure it isn't as important as
- // ITERATION, but more important than anything else.
-%left CONCAT
- // The only time an iteration can be found is in the case of M^x where
- // M is a matrix and x is a number. No need for associativity, but we
- // need priority for cases like M::N^2 - we need to first iterate and
- // then concatenate.
-%nonassoc ITERATION
 %token TRANSPOSE
 
 
@@ -179,6 +176,11 @@
 
  // To simulate BNF iteration, use XIter variables for every X with iterations.
 
+S				:	EnterScope Stmt {
+					
+					}
+				;
+ 
 Stmt			:	TYPE Init InitIter SC {
 						
 					}
@@ -191,20 +193,40 @@ Stmt			:	TYPE Init InitIter SC {
 				|	READ ID SC {
 					
 					}
-				|	IF LP Bool RP EnterScope SaveAddress Stmt {
+				|	IF LP Bool RP EnterScope SaveAddress Stmt %prec IF {
 					
 					}
-				|	IF LP Bool RP EnterScope SaveAddress Stmt PutGoto ELSE EnterScope SaveAddress Stmt {
+				|	IF LP Bool RP EnterScope SaveAddress Stmt ELSE PutGoto EnterScope SaveAddress Stmt {
 					
 					}
 				|	WHILE SaveAddress LP Bool RP EnterScope SaveAddress Stmt {
 						
 					}
-				|	FOREACH EnterScope LP ID IN Exp RP SaveAddress Stmt {
-					
+				|	ForeachPrep IN Exp RP PutGoto SaveAddress Stmt {
+						// Get next address, fill in the PutGoto variable
+						// so the first thing that happens (before Stmt's code)
+						// is the loop initialization code.
+						// Exit scope at the end
+						
 					}
 				|	LC EnterScope Stmt IterStmts RC {
 					
+					}
+				;
+
+ForeachPrep		:	FOREACH EnterScope LP ID {
+						// Declare ID, save it in ForeachPrep somehow.
+						// Create 
+					}
+				;
+
+SaveAddress		:	{
+	
+					}
+				;
+
+PutGoto			:	{
+	
 					}
 				;
 
