@@ -1,5 +1,6 @@
 %{
 	#include <iostream>
+	#include <sstream>
 	#include <list>
 	#include <set>
 	#include <vector>
@@ -231,12 +232,13 @@ ForeachPrep		:	FOREACH EnterScope LP ID {
 				;
 
 SaveAddress		:	{
-	
+						$$.buffer_offset = next();
 					}
 				;
 
 PutGoto			:	{
-	
+						$$.next_list = makelist(next());
+						emit("goto ");
 					}
 				;
 
@@ -907,9 +909,9 @@ void handle_matrix_dereference(
 
 // Returns a string "s[i]" where i is the input value
 string s(int i) {
-	ostringstream os;
-	os << "s[" << i << "]";
-	return os.str();
+	ostringstream oss;
+	oss << "s[" << i << "]";
+	return oss.str();
 }
 	
 
