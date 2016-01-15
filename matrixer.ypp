@@ -200,8 +200,8 @@
  // To simulate BNF iteration, use XIter variables for every X with iterations.
 
 S				:	EnterScope Stmt {
-					
-					}
+	                    exit_scope();
+                    }
 				;
  
 Stmt			:	TYPE Init InitIter SC {
@@ -260,13 +260,29 @@ Stmt			:	TYPE Init InitIter SC {
 						}
 					}
 				|	IF LP Bool RP EnterScope SaveAddress Stmt %prec IF {
-					
+                        bp($3.true_list, $6.buffer_offset);
+                        $$.next_list = merge($3.false_list, $7.next_list);
+
+                        exit_scope();
 					}
-				|	IF LP Bool RP EnterScope SaveAddress Stmt ELSE PutGoto EnterScope SaveAddress Stmt {
-					
+				|	IF LP Bool RP EnterScope SaveAddress Stmt ELSE PutGoto ExitScope EnterScope SaveAddress Stmt {
+                        bp($3.true_list, $6.buffer_offset);
+                        bp($3.false_list, $12.buffer_offset);
+                        $$.next_list = merge($7.false_list, $13.next_list);
+                        $$.next_list = merge($$.next_list, $9.next_list);
+
+                        exit_scope();
 					}
 				|	WHILE SaveAddress LP Bool RP EnterScope SaveAddress Stmt {
-						
+                        bp($4.true_list, $7.buffer_offset);
+                        
+                        bp($8.next_list, $2.buffer_offset);
+
+                        emit("goto " + $2.buffer_offset);
+
+                        $$.next_list = $4.false_list;
+
+                        exit_scope();
 					}
 				|	ForeachPrep IN Exp RP PutGoto SaveAddress Stmt {
 						// Get next address, fill in the PutGoto variable
@@ -274,9 +290,13 @@ Stmt			:	TYPE Init InitIter SC {
 						// is the loop initialization code.
 						// Exit scope at the end
 						assert_matrix($3);
+
+                        exit_scope();
 					}
 				|	LC EnterScope Stmt IterStmts RC {
 					
+
+                        exit_scope();
 					}
 				;
 
@@ -304,7 +324,10 @@ EnterScope		:	{
 						symbol_table.push_back(map<string,YYSTYPE>());
 					}
 				;
-
+ExitScope       :	{
+                        exit_scope();
+                    }
+                ;
 IterStmts		:	Stmt IterStmts {
 						
 					}
