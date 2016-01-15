@@ -806,25 +806,54 @@ void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols,
 // Negate the value of the input, whether it's a scalar or matrix.
 // The values of is_int_const and is_matrix are copied.
 YYSTYPE negate_value(const YYSTYPE& stype) {
-	YYSTYPE negated = stype;
-	if (stype.is_matrix)
-		for (int i=0; i<stype.rows; ++i)
-			for (int j=0; j<stype.cols; ++j)
-				negated.matrix[i][j] = -stype.matrix[i][j];
-	else negated.value *= -1;
+	YYSTYPE negated;
+	negated.stack_offset = newTemp();
+	if (stype.is_matrix) {
+		pop_stack(1);	// In the loop we use s(newTemp()) always, so bring the sp back one cell
+		for (int i=0; i<stype.rows; ++i) {	// before the loop starts
+			for (int j=0; j<stype.cols; ++j) {
+				ostringstream os;
+				os << s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j);
+				emit(os.str());
+			}
+		}
+	}
+	else {
+		ostringstream os;
+		os << s(negated.stack_offset) << "=0-" << s(stype.stack_offset);
+		emit(os.str());
+	}
+	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
+	// used.
+	put_temp_in_symbol_table(negated);
 	return negated;
 }
 
 // Add the two values (matrix or not).
 // Assume addition is allowed! Error handling should be done in the semantic analysis!
-// The value of is_matrix is copied, and the value of is_int_const is calculated.
 YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
-	YYSTYPE sum = op1;
-	if (op1.is_matrix)
-		for (int i=0; i<op1.rows; ++i)
-			for (int j=0; j<op1.cols; ++j)
-				sum.matrix[i][j] += op2.matrix[i][j];
-	else sum.value += op2.value;
+	YYSTYPE sum;
+	sum.stack_offset = newTemp();
+	if (op1.is_matrix) {
+		pop_stack(1);	// To align sum's stack_offset field with the following loop
+		for (int i=0; i<op1.rows; ++i) {
+			for (int j=0; j<op1.cols; ++j) {
+				ostringstream os;
+				os << s(newTemp()) << "="
+						<< s(op1.stack_offset+i*op1.cols+j) << "+" 
+						<< s(op2.stack_offset+i*op1.cols+j);
+				emit(os.str());
+			}
+		}
+	}
+	else {
+		ostringstream os;
+		os << s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset);
+		emit(os.str());
+	}
+	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
+	// used.
+	put_temp_in_symbol_table(sum);
 	return sum;
 }
 
@@ -835,38 +864,74 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 	YYSTYPE product;
 	product.is_matrix = (op1.is_matrix || op2.is_matrix);
+	// Start by marking the current location:
+	product.stack_offset = newTemp();
+	pop_stack(1);
+	// Split into cases, depending on the multiplication type.
+	// First, the hardest:
 	if (op1.is_matrix && op2.is_matrix) {
 		// Matrix product! What fun!
 		// Set up the new matrix dimensions:
 		product.rows=op1.rows;
 		product.cols=op2.cols;
-		product.matrix.resize(product.rows, vector<int>(product.cols, 0));
-		// Calculate their values:
-		for (int row=0; row<product.rows; ++row)
-			for (int col=0; col<product.cols; ++col)
-				for (int i=0; i<op1.cols; ++i)
-					product.matrix[row][col] += op1.matrix[row][i]*op2.matrix[i][col];
+		// We need a temporary variable to store cell-by-cell product results.
+		// Take the location at the (soon to be) end of the stack, after the new output matrix,
+		// and simply refrain from updating the stack pointer.
+		int temp_offset = product.stack_offset + product.rows*product.cols;
+		string s_temp = s(temp_offset);
+		for (int row=0; row<product.rows; ++row) {
+			for (int col=0; col<product.cols; ++col) {
+				string cell_location = s(newTemp());
+				emit(cell_location + string("=0"));
+				for (int k=0; k<op1.cols; ++k) {
+					ostringstream os;
+					os << s_temp << "="
+						<< s(op1.stack_offset + row*op1.cols + k) << "*"
+						<< s(op2.stack_offset + k*op2.cols + col);
+					emit(os.str());
+					os.str("");
+					os << cell_location << "=" << cell_location << "+" << s_temp;
+					emit(os.str());
+				}
+			}
+		}
 	}
+	// Next, scalar-matrix product:
 	else if (op1.is_matrix || op2.is_matrix) {
+		// Here, just emit code that multiplies the expression with each matrix cell.
+		// Get the stack location of the matrix:
+		int matrix_offset;
 		if (op1.is_matrix) {
-			product.matrix = op1.matrix;
+			matrix_offset = op1.stack_offset;
 			product.rows = op1.rows;
 			product.cols = op1.cols;
 		}
 		else {
-			product.matrix = op2.matrix;
+			matrix_offset = op2.stack_offset;
 			product.rows = op2.rows;
 			product.cols = op2.cols;
 		}
-		int multiplier = op1.is_matrix ? op2.value : op1.value;
-		for (int i=0; i<product.rows; ++i)
-			for (int j=0; j<product.cols; ++j)
-				product.matrix[i][j] *= multiplier;
+		// Get the stack location of the multiplier:
+		string s_multiplier = op1.is_matrix ? op2.name : op1.name;
+		// Output the product calculation code
+		for (int i=0; i<product.rows; ++i) {
+			for (int j=0; j<product.cols; ++j) {
+				ostringstream os;
+				os << s(newTemp()) << "="
+					<< s(matrix_offset + i*product.rows + j) << "*"
+					<< s_multiplier;
+				emit(os.str());
+			}
+		}
 	}
 	else {
 		product.is_int_const = (op1.is_int_const && op2.is_int_const);
-		product.value = op1.value * op2.value;
+		ostringstream os;
+		os << s(newTemp()) << "=" << op1.name << "*" << op2.name;
+		emit(os.str());
 	}
+	// Add to the symbol table (so we can pop it later)
+	put_temp_in_symbol_table(product);
 	return product;
 }
 
