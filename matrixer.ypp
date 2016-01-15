@@ -199,7 +199,7 @@ Stmt			:	TYPE Init InitIter SC {
 						
 					}
 				|	READ ID SC {
-					
+						$$ = assert_declared_and_fetch($2.name);
 					}
 				|	IF LP Bool RP EnterScope SaveAddress Stmt %prec IF {
 					
@@ -225,6 +225,8 @@ Stmt			:	TYPE Init InitIter SC {
 ForeachPrep		:	FOREACH EnterScope LP ID {
 						// Declare ID, save it in ForeachPrep somehow.
 						// Create 
+						set_stype_to_int($$, $4.name, 0, false);
+						symbol_table.back()[$$.name] = $$;
 					}
 				;
 
@@ -567,7 +569,8 @@ Bool			:	Exp RELOP Exp {
 				;
 				
 OutputSpecifier :	ID {
-					
+						$$ = assert_declared_and_fetch($1.name);
+
 					}
 				|	STRING {
 					
