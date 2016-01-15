@@ -1,5 +1,5 @@
 #include "bp.hpp"
-#include "attributes.h" // TODO: remove this
+#include "attributes.h"
 #include <vector>
 #include <iostream>
 #include <sstream>
