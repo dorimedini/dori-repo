@@ -897,7 +897,7 @@ void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols,
 // Negate the value of the input, whether it's a scalar or matrix.
 // The values of is_int_const and is_matrix are copied.
 YYSTYPE negate_value(const YYSTYPE& stype) {
-	YYSTYPE negated;
+	YYSTYPE negated = stype;	// Copy basic data... int? const int? etc.
 	negated.stack_offset = newTemp();
 	if (stype.is_matrix) {
 		pop_stack(1);	// In the loop we use s(newTemp()) always, so bring the sp back one cell
@@ -910,6 +910,7 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 		}
 	}
 	else {
+		negated.value = -stype.value; // In case this is a const int
 		ostringstream os;
 		os << s(negated.stack_offset) << "=0-" << s(stype.stack_offset);
 		emit(os.str());
@@ -924,7 +925,7 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 // Assume addition is allowed! Error handling should be done in the semantic analysis!
 YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 	YYSTYPE sum;
-	sum.is_matrix = op1.is_matrix;
+	sum.is_matrix = op1.is_matrix; // Assuming op1.is_matrix == op2.is_matrix
 	sum.stack_offset = newTemp();
 	if (op1.is_matrix) {
 		pop_stack(1);	// To align sum's stack_offset field with the following loop
@@ -939,6 +940,8 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 		}
 	}
 	else {
+		sum.is_int_const = (op1.is_int_const && op2.is_int_const);
+		sum.value = op1.value + op2.value;	// May be garbage, but if sum.is_int_const then it's not
 		ostringstream os;
 		os << s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset);
 		emit(os.str());
@@ -956,6 +959,7 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 	YYSTYPE product;
 	product.is_matrix = (op1.is_matrix || op2.is_matrix);
+	product.is_int_const = (op1.is_int_const && op2.is_int_const);
 	// Start by marking the current location:
 	product.stack_offset = newTemp();
 	pop_stack(1);
@@ -1017,7 +1021,7 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 		}
 	}
 	else {
-		product.is_int_const = (op1.is_int_const && op2.is_int_const);
+		product.value = op1.value * op2.value;
 		ostringstream os;
 		os << s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset);
 		emit(os.str());
