@@ -141,6 +141,10 @@
 	
 	// Searches the symbol table for the variable and returns the stack offset.
 	int get_stack_offset(const string& name);
+	
+	// Adds a temporary variable into the symbol table, so we can pop it later automatically
+	// using exit_scope()
+	void put_temp_in_symbol_table(YYSTYPE& stype);
 
 %}
 
@@ -1019,6 +1023,12 @@ int get_stack_offset(const string& name) {
 	return tmp.stack_offset;
 }
 
+// Adds a temporary variable into the symbol table, so we can pop it later automatically
+// using exit_scope()
+void put_temp_in_symbol_table(YYSTYPE& stype) {
+	stype.name = s(stype.stack_offset);
+	symbol_table.back()[stype.name] = stype;
+}
 
 
 
