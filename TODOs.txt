@@ -5,3 +5,5 @@ V	1. ELSE needs to have higher priority than the IF rule, to solve ambiguity?
 	   from the stack.
 V	3. Associativity for boolean operators?
 	4. When assigning to an Lvalue, careful not to make any mistakes while creating the IR code...
+	5. REMEMBER: We ALWAYS assume every Exp contains a valid Exp.stack_offset, where
+	   Exp.stack_offset is the location of the temporary variable Exp represents.

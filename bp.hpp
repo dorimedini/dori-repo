@@ -44,6 +44,7 @@ int newTemp();
  *    Deducts x from the stack pointer to free up memory
  */
 void pop_stack(int x);
+void stack_advance(int d);	// Advance the stack pointer d places, to make room for a matrix usually
 list<int> makelist(int litem);
 list<int> merge(list<int> l1,list<int> l2);
 #endif

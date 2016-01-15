@@ -8,6 +8,7 @@
 	#include <map>
 	#include "attributes.h"
 	#include "bp.hpp"
+	using std::string;
 	using std::cout;
 	using std::endl;
 	using std::list;
@@ -92,6 +93,16 @@
 			UTILITY FUNCTIONS
 	*******************************/
 	
+	// Instead of writing:
+	// ostringstream os;
+	// os << long << "and" << boring << s(stream);
+	// emit(os.str());
+	// Just use the macro!
+	#define EMIT_OS(os,stream) \
+			ostringstream os; \
+			os << stream; \
+			emit(os.str())
+	
 	void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const);
 
 	void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols, 
@@ -119,7 +130,9 @@
 	// Pops one element of the symbol table and frees up it's memory
 	void exit_scope();
 	
-	// Takes care of dereferencing a matrix cell, validating arguments and such
+	// After validating arguments, basically does:
+	// target_stype=matrix_name[row_stype.value][col_stype.value];
+	// Also updates the stack_offset field to reflect the cell's location in the stack.
 	void handle_matrix_dereference(
 		YYSTYPE& target_stype,
 		string matrix_name,
@@ -141,6 +154,14 @@
 	
 	// Searches the symbol table for the variable and returns the stack offset.
 	int get_stack_offset(const string& name);
+	
+	// Adds a temporary variable into the symbol table, so we can pop it later automatically
+	// using exit_scope()
+	// If requested, this function will also advance the stack pointer by the amount needed to store
+	// the temporary variable in memory.
+	// IMPORTANT: For this to work, the STYPE parameter must have valid is_matrix, rows and cols
+	// fields. If allocation isn't requested, the stack_offset field must also be valid.
+	void put_temp_in_symbol_table(YYSTYPE& stype, bool allocate);
 
     void emit_if_statement(string val1, string relop, string val2, string goto_address = "");
 
@@ -497,34 +518,40 @@ Exp				:	Exp PLUS Exp {
 						// is_int_const fields of the two right-side Exps.
 						assert_type_match($1,$3,'/');
 						assert_non_zero($3.value);
+						// Update internal compiler data
 						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
+						put_temp_in_symbol_table($$, true);
+						// Output code
+						EMIT_OS(os, s($$.stack_offset) << "=" << $1.name << "/" << $3.name);
 					}
 				|	UNARY_MINUS Exp {
 						// Negate the value (may be a matrix!).
 						// Set the left Exp's is_int_const field to the is_int_const field of the right-side
 						// Exp.
 						$$ = negate_value($2);
-						DO_DEBUG(cout << "negated a");
-						DO_DEBUG(cout << ($2.is_matrix ? " matrix" : "n int"));
-						DO_DEBUG(cout << " into a" << ($$.is_matrix ? " matrix" : "n int"));
-						DO_DEBUG(cout << endl);
 					}
 				|	Mat {
 						// Update values (rows, columns, matrix data) and update
 						// the is_int_const field (using Mat.is_int_const).
 						// If Mat is undeclared, this should be caught in the
 						// reduction to Mat.
-						$$ = $1;	// All relevant field will be correctly copied
+						$$ = $1;
+						// All relevant fields will be correctly copied (no need to create a new
+						// temporary variable in the code).
 					}
 				|	NUM {
-						// Update the value, set as constant number.
+						// Update internal compiler data
 						set_stype_to_int($$, "", $1.value, true);
+						put_temp_in_symbol_table($$, true);
+						// Output code
+						EMIT_OS(os, s($$.stack_offset) << "=" << $1.value);
 					}
 				|	ID {
 						// All IDs have values, types etc. Copy them, and set
 						// Exp to non-constant. Make sure ID.name has been declared!
 						// Let Exp equal the value of the symbol, using the symbol table.
 						$$ = assert_declared_and_fetch($1.name);
+						// No need to create a new temporary variable
 						DO_DEBUG(if ($$.is_int_const != false) cout << 
 							"ERROR: ID's is_int_const is not set to false!" << endl;);
 					}
@@ -534,6 +561,7 @@ Exp				:	Exp PLUS Exp {
 						// Set the left Exp's is_int_const field to the 
 						// is_int_const field of the right-side Exp.
 						$$ = $2;
+						// No need to create a new temporary variable
 					}
 				|	ID LB Exp CS Exp RB {
 						handle_matrix_dereference($$, $1.name, $3, $5);
@@ -936,25 +964,50 @@ void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols,
 // Negate the value of the input, whether it's a scalar or matrix.
 // The values of is_int_const and is_matrix are copied.
 YYSTYPE negate_value(const YYSTYPE& stype) {
-	YYSTYPE negated = stype;
-	if (stype.is_matrix)
-		for (int i=0; i<stype.rows; ++i)
-			for (int j=0; j<stype.cols; ++j)
-				negated.matrix[i][j] = -stype.matrix[i][j];
-	else negated.value *= -1;
+	YYSTYPE negated = stype;	// Copy basic data... int? const int? etc.
+	negated.stack_offset = newTemp();
+	if (stype.is_matrix) {
+		pop_stack(1);	// In the loop we use s(newTemp()) always, so bring the sp back one cell
+		for (int i=0; i<stype.rows; ++i) {	// before the loop starts
+			for (int j=0; j<stype.cols; ++j) {
+				EMIT_OS(os, s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j));
+			}
+		}
+	}
+	else {
+		negated.value = -stype.value; // In case this is a const int
+		EMIT_OS(os, s(negated.stack_offset) << "=0-" << s(stype.stack_offset));
+	}
+	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
+	// used.
+	put_temp_in_symbol_table(negated, false);
 	return negated;
 }
 
 // Add the two values (matrix or not).
 // Assume addition is allowed! Error handling should be done in the semantic analysis!
-// The value of is_matrix is copied, and the value of is_int_const is calculated.
 YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
-	YYSTYPE sum = op1;
-	if (op1.is_matrix)
-		for (int i=0; i<op1.rows; ++i)
-			for (int j=0; j<op1.cols; ++j)
-				sum.matrix[i][j] += op2.matrix[i][j];
-	else sum.value += op2.value;
+	YYSTYPE sum;
+	sum.is_matrix = op1.is_matrix; // Assuming op1.is_matrix == op2.is_matrix
+	sum.stack_offset = newTemp();
+	if (op1.is_matrix) {
+		pop_stack(1);	// To align sum's stack_offset field with the following loop
+		for (int i=0; i<op1.rows; ++i) {
+			for (int j=0; j<op1.cols; ++j) {
+				EMIT_OS(os, s(newTemp()) << "="
+						<< s(op1.stack_offset+i*op1.cols+j) << "+" 
+						<< s(op2.stack_offset+i*op1.cols+j));
+			}
+		}
+	}
+	else {
+		sum.is_int_const = (op1.is_int_const && op2.is_int_const);
+		sum.value = op1.value + op2.value;	// May be garbage, but if sum.is_int_const then it's not
+		EMIT_OS(os, s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset));
+	}
+	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
+	// used.
+	put_temp_in_symbol_table(sum, false);
 	return sum;
 }
 
@@ -965,38 +1018,67 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 	YYSTYPE product;
 	product.is_matrix = (op1.is_matrix || op2.is_matrix);
+	product.is_int_const = (op1.is_int_const && op2.is_int_const);
+	// Start by marking the current location:
+	product.stack_offset = newTemp();
+	pop_stack(1);
+	// Split into cases, depending on the multiplication type.
+	// First, the hardest:
 	if (op1.is_matrix && op2.is_matrix) {
 		// Matrix product! What fun!
 		// Set up the new matrix dimensions:
 		product.rows=op1.rows;
 		product.cols=op2.cols;
-		product.matrix.resize(product.rows, vector<int>(product.cols, 0));
-		// Calculate their values:
-		for (int row=0; row<product.rows; ++row)
-			for (int col=0; col<product.cols; ++col)
-				for (int i=0; i<op1.cols; ++i)
-					product.matrix[row][col] += op1.matrix[row][i]*op2.matrix[i][col];
+		// We need a temporary variable to store cell-by-cell product results.
+		// Take the location at the (soon to be) end of the stack, after the new output matrix,
+		// and simply refrain from updating the stack pointer.
+		int temp_offset = product.stack_offset + product.rows*product.cols;
+		string s_temp = s(temp_offset);
+		for (int row=0; row<product.rows; ++row) {
+			for (int col=0; col<product.cols; ++col) {
+				string cell_location = s(newTemp());
+				emit(cell_location + string("=0"));
+				for (int k=0; k<op1.cols; ++k) {
+					EMIT_OS(os1, s_temp << "="
+									<< s(op1.stack_offset + row*op1.cols + k) << "*"
+									<< s(op2.stack_offset + k*op2.cols + col));
+					EMIT_OS(os2, cell_location << "=" << cell_location << "+" << s_temp);
+				}
+			}
+		}
 	}
+	// Next, scalar-matrix product:
 	else if (op1.is_matrix || op2.is_matrix) {
+		// Here, just emit code that multiplies the expression with each matrix cell.
+		// Get the stack location of the matrix:
+		int matrix_offset;
 		if (op1.is_matrix) {
-			product.matrix = op1.matrix;
+			matrix_offset = op1.stack_offset;
 			product.rows = op1.rows;
 			product.cols = op1.cols;
 		}
 		else {
-			product.matrix = op2.matrix;
+			matrix_offset = op2.stack_offset;
 			product.rows = op2.rows;
 			product.cols = op2.cols;
 		}
-		int multiplier = op1.is_matrix ? op2.value : op1.value;
-		for (int i=0; i<product.rows; ++i)
-			for (int j=0; j<product.cols; ++j)
-				product.matrix[i][j] *= multiplier;
+		// Get the stack location of the multiplier:
+		string s_multiplier = op1.is_matrix ? s(op2.stack_offset) : s(op1.stack_offset);
+		// Output the product calculation code
+		for (int i=0; i<product.rows; ++i) {
+			for (int j=0; j<product.cols; ++j) {
+				EMIT_OS(os, s(newTemp()) << "="
+										<< s(matrix_offset + i*product.rows + j) << "*"
+										<< s_multiplier);
+			}
+		}
 	}
 	else {
-		product.is_int_const = (op1.is_int_const && op2.is_int_const);
 		product.value = op1.value * op2.value;
+		EMIT_OS(os, s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset));
 	}
+	// Add to the symbol table (so we can pop it later)
+	put_temp_in_symbol_table(product, false);
 	return product;
 }
 
@@ -1047,6 +1129,9 @@ void exit_scope() {
 	symbol_table.pop_back();
 }
 
+// After validating arguments, basically does:
+// target_stype=matrix_name[row_stype.value][col_stype.value];
+// Also updates the stack_offset field to reflect the cell's location in the stack.
 void handle_matrix_dereference(
 	YYSTYPE& target_stype,
 	string matrix_name, 
@@ -1073,6 +1158,12 @@ void handle_matrix_dereference(
 
 	assert_in_bounds(matrix_stype, row_stype.value, col_stype.value);
 	set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
+	
+	// Update the stack offset of the dereferenced cell:
+	target_stype.stack_offset = 
+			matrix_stype.stack_offset + 
+			matrix_stype.cols*row_stype.value + col_stype.value;
+
 }
 
 // Returns a string "s[i]" where i is the input value
@@ -1154,7 +1245,34 @@ int get_stack_offset(const string& name) {
 	return tmp.stack_offset;
 }
 
+// Adds a temporary variable into the symbol table, so we can pop it later automatically
+// using exit_scope().
+// If requested, this function will also advance the stack pointer by the amount needed to store
+// the temporary variable in memory.
+// IMPORTANT: For this to work, the STYPE parameter must have valid is_matrix, rows and cols
+// fields. If allocation isn't requested, the stack_offset field must also be valid.
+void put_temp_in_symbol_table(YYSTYPE& stype, bool allocate) {
+	if (allocate) {
+		stype.stack_offset = (newTemp());
+		if (stype.is_matrix) {
+			stack_advance(stype.rows*stype.cols - 1);
+		}
+	}
+	stype.name = s(stype.stack_offset);
+	symbol_table.back()[stype.name] = stype;
+}
+
 void emit_if_statement(string val1, string relop, string val2, string goto_address)
 {
     emit("if " + val1 + " " + relop + " " + val2 + " goto " + goto_address);
 }
+
+
+
+
+
+
+
+
+
+
