@@ -462,9 +462,7 @@ Exp				:	Exp PLUS Exp {
 						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
 						put_temp_in_symbol_table($$, true);
 						// Output code
-						ostringstream os;
-						os << s($$.stack_offset) << "=" << $1.name << "/" << $3.name;
-						emit(os.str());
+						EMIT_OS(os, s($$.stack_offset) << "=" << $1.name << "/" << $3.name);
 					}
 				|	UNARY_MINUS Exp {
 						// Negate the value (may be a matrix!).
@@ -486,9 +484,7 @@ Exp				:	Exp PLUS Exp {
 						set_stype_to_int($$, "", $1.value, true);
 						put_temp_in_symbol_table($$, true);
 						// Output code
-						ostringstream os;
-						os << s($$.stack_offset) << "=" << $1.value;
-						emit(os.str());
+						EMIT_OS(os, s($$.stack_offset) << "=" << $1.value);
 					}
 				|	ID {
 						// All IDs have values, types etc. Copy them, and set
@@ -916,17 +912,13 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 		pop_stack(1);	// In the loop we use s(newTemp()) always, so bring the sp back one cell
 		for (int i=0; i<stype.rows; ++i) {	// before the loop starts
 			for (int j=0; j<stype.cols; ++j) {
-				ostringstream os;
-				os << s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j);
-				emit(os.str());
+				EMIT_OS(os, s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j));
 			}
 		}
 	}
 	else {
 		negated.value = -stype.value; // In case this is a const int
-		ostringstream os;
-		os << s(negated.stack_offset) << "=0-" << s(stype.stack_offset);
-		emit(os.str());
+		EMIT_OS(os, s(negated.stack_offset) << "=0-" << s(stype.stack_offset));
 	}
 	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
 	// used.
@@ -944,20 +936,16 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 		pop_stack(1);	// To align sum's stack_offset field with the following loop
 		for (int i=0; i<op1.rows; ++i) {
 			for (int j=0; j<op1.cols; ++j) {
-				ostringstream os;
-				os << s(newTemp()) << "="
+				EMIT_OS(os, s(newTemp()) << "="
 						<< s(op1.stack_offset+i*op1.cols+j) << "+" 
-						<< s(op2.stack_offset+i*op1.cols+j);
-				emit(os.str());
+						<< s(op2.stack_offset+i*op1.cols+j));
 			}
 		}
 	}
 	else {
 		sum.is_int_const = (op1.is_int_const && op2.is_int_const);
 		sum.value = op1.value + op2.value;	// May be garbage, but if sum.is_int_const then it's not
-		ostringstream os;
-		os << s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset);
-		emit(os.str());
+		EMIT_OS(os, s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset));
 	}
 	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
 	// used.
@@ -993,14 +981,10 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 				string cell_location = s(newTemp());
 				emit(cell_location + string("=0"));
 				for (int k=0; k<op1.cols; ++k) {
-					ostringstream os;
-					os << s_temp << "="
-						<< s(op1.stack_offset + row*op1.cols + k) << "*"
-						<< s(op2.stack_offset + k*op2.cols + col);
-					emit(os.str());
-					os.str("");
-					os << cell_location << "=" << cell_location << "+" << s_temp;
-					emit(os.str());
+					EMIT_OS(os1, s_temp << "="
+									<< s(op1.stack_offset + row*op1.cols + k) << "*"
+									<< s(op2.stack_offset + k*op2.cols + col));
+					EMIT_OS(os2, cell_location << "=" << cell_location << "+" << s_temp);
 				}
 			}
 		}
@@ -1025,19 +1009,15 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 		// Output the product calculation code
 		for (int i=0; i<product.rows; ++i) {
 			for (int j=0; j<product.cols; ++j) {
-				ostringstream os;
-				os << s(newTemp()) << "="
-					<< s(matrix_offset + i*product.rows + j) << "*"
-					<< s_multiplier;
-				emit(os.str());
+				EMIT_OS(os, s(newTemp()) << "="
+										<< s(matrix_offset + i*product.rows + j) << "*"
+										<< s_multiplier);
 			}
 		}
 	}
 	else {
 		product.value = op1.value * op2.value;
-		ostringstream os;
-		os << s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset);
-		emit(os.str());
+		EMIT_OS(os, s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset));
 	}
 	// Add to the symbol table (so we can pop it later)
 	put_temp_in_symbol_table(product, false);
