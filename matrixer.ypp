@@ -8,6 +8,7 @@
 	#include <map>
 	#include "attributes.h"
 	#include "bp.hpp"
+	using std::string;
 	using std::cout;
 	using std::endl;
 	using std::list;
