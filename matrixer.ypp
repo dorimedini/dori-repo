@@ -1102,7 +1102,7 @@ void handle_matrix_dereference(
 	set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
 	
 	// Update the stack offset of the dereferenced cell:
-	target_type.stack_offset = 
+	target_stype.stack_offset = 
 			matrix_stype.stack_offset + 
 			matrix_stype.cols*row_stype.value + col_stype.value;
 
