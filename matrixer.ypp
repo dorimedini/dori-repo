@@ -142,7 +142,7 @@
 	// Searches the symbol table for the variable and returns the stack offset.
 	int get_stack_offset(const string& name);
 
-    void emit_if_statement(string val1, string relop, string val2);
+    void emit_if_statement(string val1, string relop, string val2, string goto_address = "");
 
 %}
 
@@ -284,13 +284,55 @@ Stmt			:	TYPE Init InitIter SC {
 
                         exit_scope();
 					}
-				|	ForeachPrep IN Exp RP PutGoto SaveAddress Stmt {
-						// Get next address, fill in the PutGoto variable
+				|	ForeachDeclareId IN Exp RP ForeachDeclareLoopCounter PutGoto SaveAddress Stmt {
+                        YYSTYPE matrix = $3;
+                        int matrix_size = matrix.rows * matrix.cols;
+
+                        // *** Semantic checks: ***
+                        // Get next address, fill in the PutGoto variable
 						// so the first thing that happens (before Stmt's code)
 						// is the loop initialization code.
 						// Exit scope at the end
 						assert_matrix($3);
 
+                        // *** Backpatching: ***
+                        bp($6.next_list, next() + matrix_size); // PutGoto's next_list 
+                        bp($8.next_list, next()); // Stmt's next_list
+
+                        // *** Emitting code: ***
+
+                        // Naming all relevant variables for not getting confused later
+                        string iterating_element = s($1.stack_offset);
+                        string loop_counter = s($5.stack_offset);
+                        int stmt_buffer_offset = $7.buffer_offset;
+                                                
+                        // matrix_size is the amount of if statements, which we would like to jump over
+                        int goto_statement_offset = next() + matrix_size;
+
+                        for (int i = 1; i < matrix_size; ++i)
+                        {
+                            /* We would like to jump over the code block of the previous iteration
+                             * (The first iteration, where the loop counter == 0,
+                             * is redirected by the PutGoto's goto.
+                             * The following ifs redirect to iteration 1 to matrix_size-1.)
+                             */
+                            goto_statement_offset += 3;
+                            emit_if_statement(loop_counter, "==", to_string(i), to_string(goto_statement_offset));
+                            // We added an if statement, so the next goto has one less statement to jump over.
+                            goto_statement_offset -= 1;
+                        }
+                        
+                        $$.next_list = make_list(next());
+                        emit("goto ");
+                        
+                        for (int i = 0; i < matrix_size; ++i)
+                        {
+                            emit(iterating_element + "=" + s(to_string(matrix.stack_offset + i)));
+                            emit(loop_counter + "=" + loop_counter + "+1");
+                            emit("goto " + stmt_buffer_offset));
+                        }
+
+                        // *** Exiting scope: ***
                         exit_scope();
 					}
 				|	LC EnterScope Stmt IterStmts RC {
@@ -300,13 +342,29 @@ Stmt			:	TYPE Init InitIter SC {
 					}
 				;
 
-ForeachPrep		:	FOREACH EnterScope LP ID {
-						// Declare ID, save it in ForeachPrep somehow.
-						// Create 
-						set_stype_to_int($$, $4.name, 0, false);
-						symbol_table.back()[$$.name] = $$;
+ForeachDeclareId 	:	FOREACH EnterScope LP ID {
+                        // TODO: Change to use declare functions (including allocating space on the stack and emitting assignment code)!!
+
+						// Declare ID
+                        YYSTYPE id_stype;
+                        set_stype_to_int(id_stype, $4.name, 0, false);
+                        symbol_table.back()[id_stype.name] = id_stype;
+                        // Setting ForeachDeclareId.stack_offset to ID's stack_offset
+                        $$.stack_offset = id_stype.stack_offset;
 					}
 				;
+
+ForeachDeclareLoopCounter: {
+                        // TODO: Change to use declare functions (including allocating space on the stack and emitting assignment code)!!
+                        
+                        // Declare the loop's temp counter variable and set it to 0
+                        YYSTYPE i_stype;
+                        set_stype_to_int(i_stype, "temp", 0, false); // TODO: handle the name
+                        symbol_table.back()[i_stype.name] = i_stype;
+                        // Setting ForeachDeclareLoopCounter.stack_offset to the loop counter's stack offset
+                        $$.stack_offset = i_stype.stack_offset;
+                    }
+                ;
 
 SaveAddress		:	{
 						$$.buffer_offset = next();
@@ -1096,7 +1154,7 @@ int get_stack_offset(const string& name) {
 	return tmp.stack_offset;
 }
 
-void emit_if_statement(string val1, string relop, string val2)
+void emit_if_statement(string val1, string relop, string val2, string goto_address)
 {
-    emit("if " + val1 + " " + relop + " " + val2 + " goto ");
+    emit("if " + val1 + " " + relop + " " + val2 + " goto " + goto_address);
 }
