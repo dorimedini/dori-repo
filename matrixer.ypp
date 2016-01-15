@@ -130,7 +130,9 @@
 	// Pops one element of the symbol table and frees up it's memory
 	void exit_scope();
 	
-	// Takes care of dereferencing a matrix cell, validating arguments and such
+	// After validating arguments, basically does:
+	// target_stype=matrix_name[row_stype.value][col_stype.value];
+	// Also updates the stack_offset field to reflect the cell's location in the stack.
 	void handle_matrix_dereference(
 		YYSTYPE& target_stype,
 		string matrix_name,
@@ -505,8 +507,6 @@ Exp				:	Exp PLUS Exp {
 					}
 				|	ID LB Exp CS Exp RB {
 						handle_matrix_dereference($$, $1.name, $3, $5);
-						// Get the specific index to set the stack_offset:
-						$$.stack_offset = $1.stack_offset + $1.cols*$3.value + $5.value;
 					}
 				;
 
@@ -1071,6 +1071,9 @@ void exit_scope() {
 	symbol_table.pop_back();
 }
 
+// After validating arguments, basically does:
+// target_stype=matrix_name[row_stype.value][col_stype.value];
+// Also updates the stack_offset field to reflect the cell's location in the stack.
 void handle_matrix_dereference(
 	YYSTYPE& target_stype,
 	string matrix_name, 
@@ -1097,6 +1100,12 @@ void handle_matrix_dereference(
 
 	assert_in_bounds(matrix_stype, row_stype.value, col_stype.value);
 	set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
+	
+	// Update the stack offset of the dereferenced cell:
+	target_type.stack_offset = 
+			matrix_stype.stack_offset + 
+			matrix_stype.cols*row_stype.value + col_stype.value;
+
 }
 
 // Returns a string "s[i]" where i is the input value
