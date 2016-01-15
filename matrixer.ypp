@@ -44,7 +44,7 @@
 	void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, char op);
 	
 	// Asserts both matrices are of the same dimensions
-	void assert_matrices_of_same_dimensions(const YYSTYPE& stype_left, const YYSTYPE& stype_right, const string op_str, bool is_matrix_declaration = false);
+	void assert_matrices_of_same_dimensions(const YYSTYPE& stype_left, const YYSTYPE& stype_right);
 	
 	// Make sure the name is available:
 	void assert_available_name(const string str);
@@ -187,6 +187,9 @@ Stmt			:	TYPE Init InitIter SC {
 					}
 				|	Lvalue ASSIGN Exp SC {
 						assert_type_match($1, $3, '=');
+						if ($1.is_matrix) {
+							assert_matrices_of_same_dimensions($1, $3);
+						}
 					}
 				|	PRINT OutputSpecifier SC {
 						
@@ -208,7 +211,7 @@ Stmt			:	TYPE Init InitIter SC {
 						// so the first thing that happens (before Stmt's code)
 						// is the loop initialization code.
 						// Exit scope at the end
-						
+						assert_matrix($3);
 					}
 				|	LC EnterScope Stmt IterStmts RC {
 					
@@ -311,7 +314,7 @@ Init			:	ID {
 						set_stype_to_matrix($$, $1.name, 
 							$3.value, $5.value, $8.matrix);
 						
-						assert_matrices_of_same_dimensions($$, $8, "=", true);
+						assert_matrices_of_same_dimensions($$, $8);
 						
 						symbol_table.back()[$$.name] = $$;
 					}
@@ -336,7 +339,7 @@ Exp				:	Exp PLUS Exp {
 						// we're summing matrices).
 						assert_type_match($1,$3,'+');
 						if ($1.is_matrix)
-							assert_matrices_of_same_dimensions($1,$3,"+");
+							assert_matrices_of_same_dimensions($1,$3);
 						$$ = add($1,$3);
 					}
 				|	Exp MINUS Exp {
@@ -347,7 +350,7 @@ Exp				:	Exp PLUS Exp {
 						// is_int_const fields of the two right-side Exps.
 						assert_type_match($1,$3,'-');
 						if ($1.is_matrix)
-							assert_matrices_of_same_dimensions($1,$3,"-");
+							assert_matrices_of_same_dimensions($1,$3);
 						$$ = add($1,negate_value($3));						
 					}
 				|	Exp MUL Exp {
@@ -627,8 +630,7 @@ void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, ch
 
 // Asserts both matrices are of the same dimensions
 void assert_matrices_of_same_dimensions(
-	const YYSTYPE& stype_left, const YYSTYPE& stype_right, 
-	const string op_str, bool is_matrix_declaration) {
+	const YYSTYPE& stype_left, const YYSTYPE& stype_right) {
 	if ((!stype_left.is_matrix) || (!stype_right.is_matrix)
 		|| stype_left.rows != stype_right.rows || stype_left.cols != stype_right.cols) {
 		semantic_error();
