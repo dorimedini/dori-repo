@@ -1,4 +1,5 @@
 #include "bp.hpp"
+#include "attributes.h" // TODO: remove this
 #include <vector>
 #include <iostream>
 #include <sstream>
@@ -13,19 +14,20 @@ int next(){
 
 void emit(string s){
     buffer.insert(buffer.end(), s);
+    DO_DEBUG(cout << s << endl);
 }
 
 void bp(list<int>& l, int address){
     ostringstream os;
     os << address;
     for(list<int>::iterator i = l.begin(); i != l.end(); i++){
-	buffer[*i] += os.str();
+        buffer[*i] += os.str();
     }
 }
 
 void printBuffer(){
     for(int i = 0; i < buffer.size(); i++){
-	cout << buffer[i] << endl;
+        cout << buffer[i] << endl;
     }
 }
 

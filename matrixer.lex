@@ -52,7 +52,7 @@ void error_handler();
 
 print					{set_unary_flag(); return PRINT;}
 read					{set_unary_flag(); return READ;}
-\"[^"]*\"				{set_unary_flag(); return STRING;}
+\"[^"]*\"				{set_unary_flag(); yylval.name = yytext; return STRING;}
 true					{set_unary_flag(); return TRUE;}
 false					{set_unary_flag(); return FALSE;}
 if						{set_unary_flag(); return IF;}

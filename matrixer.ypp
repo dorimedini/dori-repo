@@ -209,10 +209,50 @@ Stmt			:	TYPE Init InitIter SC {
 						}
 					}
 				|	PRINT OutputSpecifier SC {
-						
+						if ($2.is_string)
+						{
+							emit("printLn " + $2.name);
+						}
+						else
+						{
+							if (!$2.is_matrix) {
+								emit("printLn " + s($2.stack_offset));
+							}
+							else {
+								emit("print [");
+								for (int row = 0; row < $2.rows; ++row)
+								{
+									for (int col = 0; col < $2.cols; ++col)
+									{
+										int stack_offset = $2.stack_offset + row * $2.cols + col;
+										emit("print " + s(stack_offset));
+										if (col < $2.cols - 1) {
+											emit("print ,");
+										}
+									}
+									if (row < $2.rows - 1) {
+										emit("print ;");
+									}
+								}
+								emit("printLn ]");
+							}
+						}
 					}
 				|	READ ID SC {
 						$$ = assert_declared_and_fetch($2.name);
+						if (!$$.is_matrix) {
+							emit("input " + s($$.stack_offset));
+						}
+						else {
+							for (int row = 0; row < $$.rows; ++row)
+							{
+								for (int col = 0; col < $$.cols; ++col)
+								{
+									int stack_offset = $$.stack_offset + row * $$.cols + col;
+									emit("input " + s(stack_offset));
+								}
+							}
+						}
 					}
 				|	IF LP Bool RP EnterScope SaveAddress Stmt %prec IF {
 					
@@ -561,10 +601,11 @@ Bool			:	Exp RELOP Exp {
 				
 OutputSpecifier :	ID {
 						$$ = assert_declared_and_fetch($1.name);
-
+						$$.is_string = false;
 					}
 				|	STRING {
-					
+						$$.name = $1.name;
+						$$.is_string = true;
 					}
 				;
 				

@@ -1,8 +1,8 @@
 #ifndef __ATTRIBUTES_H
 #define __ATTRIBUTES_H
 
-/** REMOVE THIS BEFORE SUBMITTION (SET DEBUG TO 0)! */
-#define DEBUG 0
+/** TODO: REMOVE THIS BEFORE SUBMITTION (SET DEBUG TO 0)! */
+#define DEBUG 1
 #if DEBUG
 	#define DO_DEBUG(code) do { \
 			code; \
@@ -36,7 +36,7 @@ extern bool g_is_last_type_declaration_matrix;
 // has all the information it needs simply by knowing what the
 // token is (we don't care if an LP token is constant or not).
 typedef struct {
-	bool is_matrix, is_int_const;
+	bool is_matrix, is_int_const, is_string;
 	int value;	// Still need this, to calculate constant values for matrix dimensions
 	vector< vector<int> > matrix;
 	int rows, cols;	// Need these (for matrix dimensions, obviously)
