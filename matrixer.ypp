@@ -485,7 +485,7 @@ Exp				:	Exp PLUS Exp {
 						// Exp to non-constant. Make sure ID.name has been declared!
 						// Let Exp equal the value of the symbol, using the symbol table.
 						$$ = assert_declared_and_fetch($1.name);
-						// No need to create a new 
+						// No need to create a new temporary variable
 						DO_DEBUG(if ($$.is_int_const != false) cout << 
 							"ERROR: ID's is_int_const is not set to false!" << endl;);
 					}
@@ -495,9 +495,12 @@ Exp				:	Exp PLUS Exp {
 						// Set the left Exp's is_int_const field to the 
 						// is_int_const field of the right-side Exp.
 						$$ = $2;
+						// No need to create a new temporary variable
 					}
 				|	ID LB Exp CS Exp RB {
 						handle_matrix_dereference($$, $1.name, $3, $5);
+						// Get the specific index to set the stack_offset:
+						$$.stack_offset = $1.stack_offset + $1.cols*$3.value + $5.value;
 					}
 				;
 
