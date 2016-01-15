@@ -118,6 +118,8 @@
 	// Takes care of scope cleanup.
 	// Pops one element of the symbol table and frees up it's memory
 	void exit_scope();
+	
+	// Takes care of dereferencing a matrix cell, validating arguments and such
 	void handle_matrix_dereference(
 		YYSTYPE& target_stype,
 		string matrix_name,
@@ -126,6 +128,16 @@
 	
 	// Returns a string "s[i]" where i is the input value
 	string s(int i);
+	
+	// Declares a new variable, including:
+	// - Some asserts() (NOT all of them)
+	// - Updating the symbol table, including offsets
+	// - Outputs IR
+	// Assumes it's OK to declare a variable of the given type, but note that it's overloaded for
+	// declaring matrices.
+	YYSTYPE declare(string name, int value);
+	YYSTYPE declare(string name, int rows, int cols);
+	YYSTYPE declare(string name, int rows, int cols, const YYSTYPE& source);
 	
 %}
 
@@ -263,10 +275,7 @@ Init			:	ID {
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table'), and if not - add it.
 						assert_matching_declaration_type(false);
-						
-						assert_available_name($1.name);
-						set_stype_to_int($$, $1.name, 0, false);
-						symbol_table.back()[$$.name] = $$;
+						$$ = declare($1.name, 0);
 					}
 				|	ID ASSIGN Exp {
 						// Set type to integer, make sure Exp's type is the same.
@@ -276,13 +285,8 @@ Init			:	ID {
 						// names mapped in 'symbol_table').
 						// Add the name to the symbol table.
 						assert_matching_declaration_type(false);
-						
-						assert_available_name($1.name);
 						assert_scalar($3);
-						
-						set_stype_to_int($$, $1.name, $3.value, false);
-						
-						symbol_table.back()[$$.name] = $$;
+						$$ = declare($1.name, $3.value);
 					}
 				|	ID LP Exp CS Exp RP {
 						// Make sure the expressions are positive (not non-
@@ -292,16 +296,9 @@ Init			:	ID {
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table'), and if not - add it.
 						assert_matching_declaration_type(true);
-												
 						assert_matrix_arg($3);
 						assert_matrix_arg($5);
-						assert_available_name($1.name);
-						
-						set_stype_to_matrix($$, $1.name, 
-							$3.value, $5.value,
-							vector< vector<int> >());
-						$$.matrix.resize($$.rows, vector<int>($$.cols, 0));
-						symbol_table.back()[$$.name] = $$;
+						$$ = declare($1.name, $3.value, $5.value);
 					}
 				|	ID LP Exp CS Exp RP ASSIGN Exp {
 						// Several things need to be enforced here:
@@ -314,17 +311,9 @@ Init			:	ID {
 						// Make sure the name is available (not already in the set of
 						// names mapped in 'symbol_table'), and if not - add it.
 						assert_matching_declaration_type(true);
-						
 						assert_matrix_arg($3);
 						assert_matrix_arg($5);
-						assert_available_name($1.name);
-						
-						set_stype_to_matrix($$, $1.name, 
-							$3.value, $5.value, $8.matrix);
-						
-						assert_matrices_of_same_dimensions($$, $8);
-						
-						symbol_table.back()[$$.name] = $$;
+						$$ = declare($1.name, $3.value, $5.value, $8);
 					}
 				;
 
@@ -913,5 +902,55 @@ string s(int i) {
 	oss << "s[" << i << "]";
 	return oss.str();
 }
+
 	
+// Declares a new variable, including:
+// - Some asserts() (NOT all of them)
+// - Updating the symbol table, including offsets
+// - Outputs IR
+// Assumes it's OK to declare a variable of the given type, but note that it's overloaded for
+// declaring matrices.
+YYSTYPE declare(string name, int value) {
+	YYSTYPE ret;
+	assert_available_name(name);
+	set_stype_to_int(ret, name, 0, false);
+	symbol_table.back()[name] = ret;
+	emit(s(newTemp())+"=0");
+	return ret;
+}
+YYSTYPE declare(string name, int rows, int cols) {
+	YYSTYPE source;
+	source.matrix.resize(rows, vector<int>(cols, 0));
+	source.rows = rows;
+	source.cols = cols;
+	return declare(name, rows, cols, source);
+}
+YYSTYPE declare(string name, int rows, int cols, const YYSTYPE& source) {
+	YYSTYPE ret;
+	assert_available_name(name);
+	set_stype_to_matrix(ret, name, rows, cols, source.matrix);
+	assert_matrices_of_same_dimensions(ret, source);
+	symbol_table.back()[name] = ret;
+	return ret;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
