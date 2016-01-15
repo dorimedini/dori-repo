@@ -93,6 +93,16 @@
 			UTILITY FUNCTIONS
 	*******************************/
 	
+	// Instead of writing:
+	// ostringstream os;
+	// os << long << "and" << boring << s(stream);
+	// emit(os.str());
+	// Just use the macro!
+	#define EMIT_OS(os,stream) \
+			ostringstream os; \
+			os << stream; \
+			emit(os.str())
+	
 	void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const);
 
 	void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols, 
