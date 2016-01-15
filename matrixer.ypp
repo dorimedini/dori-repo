@@ -613,24 +613,40 @@ Bool			:	Exp RELOP Exp {
                     }
 				|	Exp IN Exp {
 						assert_type_match($1, $3, 'i');
+
+                        $$.true_list = list<int>();
+                        string int_val = s($1.stack_offset);
+                        int matrix_size = $3.rows * $3.cols;
+                        for (int i = $3.stack_offset; i < matrix_size; ++i)
+                        {
+                            $$.true_list.push_back(next());
+                            emit_if_statement(int_val, "==", s(i));
+                        }
+
+                        $$.false_list = makelist(next());
+                        emit("goto ");
 					}
 				|	NOT Bool {
                         $$.false_list = $2.true_list;
                         $$.true_list = $2.false_list;
 					}
-				|	Bool AND Bool {
-					
+				|	Bool AND SaveAddress Bool {
+                        bp($1.true_list, $3.buffer_offset);
+                        $$.true_list = $4.true_list;
+                        $$.false_list = merge($1.false_list, $4.false_list);
 					}
-				|	Bool OR Bool {
-					
+				|	Bool OR SaveAddress Bool {
+                        bp($1.false_list, $3.buffer_offset);
+                        $$.false_list = $4.false_list;
+                        $$.true_list = merge($1.true_list, $4.true_list);
 					}
 				|	LP Bool RP {
                         $$.false_list = $2.false_list;
                         $$.true_list = $2.true_list;
 					}
 				|	TRUE {
-                        $$.true_list = makelist(next());
                         $$.false_list = list<int>();
+                        $$.true_list = makelist(next());
                         emit("goto ");
 					}
 				|	FALSE {
