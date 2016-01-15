@@ -448,34 +448,44 @@ Exp				:	Exp PLUS Exp {
 						// is_int_const fields of the two right-side Exps.
 						assert_type_match($1,$3,'/');
 						assert_non_zero($3.value);
+						// Update internal compiler data
 						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
+						put_temp_in_symbol_table($$, true);
+						// Output code
+						ostringstream os;
+						os << s($$.stack_offset) << "=" << $1.name << "/" << $3.name;
+						emit(os.str());
 					}
 				|	UNARY_MINUS Exp {
 						// Negate the value (may be a matrix!).
 						// Set the left Exp's is_int_const field to the is_int_const field of the right-side
 						// Exp.
 						$$ = negate_value($2);
-						DO_DEBUG(cout << "negated a");
-						DO_DEBUG(cout << ($2.is_matrix ? " matrix" : "n int"));
-						DO_DEBUG(cout << " into a" << ($$.is_matrix ? " matrix" : "n int"));
-						DO_DEBUG(cout << endl);
 					}
 				|	Mat {
 						// Update values (rows, columns, matrix data) and update
 						// the is_int_const field (using Mat.is_int_const).
 						// If Mat is undeclared, this should be caught in the
 						// reduction to Mat.
-						$$ = $1;	// All relevant field will be correctly copied
+						$$ = $1;
+						// All relevant fields will be correctly copied (no need to create a new
+						// temporary variable in the code).
 					}
 				|	NUM {
-						// Update the value, set as constant number.
+						// Update internal compiler data
 						set_stype_to_int($$, "", $1.value, true);
+						put_temp_in_symbol_table($$, true);
+						// Output code
+						ostringstream os;
+						os << s($$.stack_offset) << "=" << $1.value;
+						emit(os.str());
 					}
 				|	ID {
 						// All IDs have values, types etc. Copy them, and set
 						// Exp to non-constant. Make sure ID.name has been declared!
 						// Let Exp equal the value of the symbol, using the symbol table.
 						$$ = assert_declared_and_fetch($1.name);
+						// No need to create a new 
 						DO_DEBUG(if ($$.is_int_const != false) cout << 
 							"ERROR: ID's is_int_const is not set to false!" << endl;);
 					}
@@ -906,7 +916,7 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 	}
 	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
 	// used.
-	put_temp_in_symbol_table(negated);
+	put_temp_in_symbol_table(negated, false);
 	return negated;
 }
 
@@ -914,6 +924,7 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 // Assume addition is allowed! Error handling should be done in the semantic analysis!
 YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 	YYSTYPE sum;
+	sum.is_matrix = op1.is_matrix;
 	sum.stack_offset = newTemp();
 	if (op1.is_matrix) {
 		pop_stack(1);	// To align sum's stack_offset field with the following loop
@@ -934,7 +945,7 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 	}
 	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
 	// used.
-	put_temp_in_symbol_table(sum);
+	put_temp_in_symbol_table(sum, false);
 	return sum;
 }
 
@@ -1012,7 +1023,7 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 		emit(os.str());
 	}
 	// Add to the symbol table (so we can pop it later)
-	put_temp_in_symbol_table(product);
+	put_temp_in_symbol_table(product, false);
 	return product;
 }
 
