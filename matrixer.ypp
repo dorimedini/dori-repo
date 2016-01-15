@@ -81,11 +81,7 @@
 	// Make sure we can multiply the two operands.
 	// This test is also used to test for matrix iteration.
 	void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2);
-	
-	// Make sure we can concatenate two matrices.
-	// Also makes sure they are matrices!
-	void assert_concative(const YYSTYPE& op1, const YYSTYPE& op2);
-	
+
 	void assert_non_zero(int num);
 	
 	void assert_matching_declaration_type(bool is_matrix_declaration_syntax);
@@ -116,7 +112,6 @@
 	YYSTYPE raise_matrix_to_power(const YYSTYPE& matrix_op, 
 		const YYSTYPE& exponent_op);
 	YYSTYPE transpose(const YYSTYPE& op);
-	YYSTYPE concat(const YYSTYPE& op1, const YYSTYPE& op2);
 	
 	// Takes care of scope cleanup.
 	// Pops one element of the symbol table and frees up it's memory
@@ -539,10 +534,10 @@ Lvalue			:	ID {
 				;
 				
 Bool			:	Exp RELOP Exp {
-					cout << $2.name << endl;
+						assert_type_match($1, $3, '<');
 					}
 				|	Exp IN Exp {
-					
+						assert_type_match($1, $3, 'i');
 					}
 				|	NOT Bool {
 					
@@ -606,23 +601,23 @@ void semantic_error() {
 // Make sure the two operands can perform the operation.
 void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, char op) {
 	bool mismatch=0;
-	string op_str = (op == ':') ? "::" : string(1,op);
 	switch(op) {
 		case '+':
 		case '-':
+		case '=':
+			// operations on 2 ints or 2 matrices
 			mismatch = (stype_left.is_matrix != stype_right.is_matrix);
 			break;
 		case '^':
 			mismatch = (!stype_left.is_matrix || stype_right.is_matrix);
 			break;
-		case ':':
-			mismatch = (!stype_left.is_matrix || !stype_right.is_matrix);
+		case 'i': // for IN token
+			mismatch = (stype_left.is_matrix || !stype_right.is_matrix);
 			break;
 		case '/':
+		case '<': // for all RELOP operations
+			// operations on 2 ints
 			mismatch = (stype_left.is_matrix || stype_right.is_matrix);
-			break;
-		case '=':
-			mismatch = (stype_left.is_matrix != stype_right.is_matrix);
 			break;
 	}
 	if (mismatch) {
@@ -719,13 +714,6 @@ void assert_matrix(const YYSTYPE& stype) {
 // This only fails for matrices with bad dimensions.
 void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2) {
 	if (op1.is_matrix && op2.is_matrix && op1.cols != op2.rows)
-		semantic_error();
-}
-
-// Make sure we can concatenate two matrices.
-// Also makes sure they are matrices!
-void assert_concative(const YYSTYPE& op1, const YYSTYPE& op2) {
-	if (op1.rows != op2.rows)
 		semantic_error();
 }
 
@@ -865,26 +853,6 @@ YYSTYPE transpose(const YYSTYPE& matrix_op)
 	}
 	
 	return transposed;
-}
-
-YYSTYPE concat(const YYSTYPE& op1, const YYSTYPE& op2)
-{
-	YYSTYPE result;
-	
-	set_stype_to_matrix(result, "", 
-		op1.rows, op1.cols + op2.cols,
-		op1.matrix);
-		
-	for (int i = 0; i < result.rows; ++i) 
-	{
-		result.matrix[i].resize(result.cols);
-		for (int j = 0; j < op2.cols; ++j)
-		{
-			result.matrix[i][op1.cols + j] = op2.matrix[i][j];
-		}
-	}
-	
-	return result;
 }
 
 // Takes care of scope cleanup.
