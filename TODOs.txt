@@ -8,3 +8,4 @@ V	3. Associativity for boolean operators?
 	5. REMEMBER: We ALWAYS assume every Exp contains a valid Exp.stack_offset, where
 	   Exp.stack_offset is the location of the temporary variable Exp represents.
 	6. Eliminate stype.matrix
+	7. Make sure there are no conflicts in bison, not even implicit ones.

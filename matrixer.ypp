@@ -172,6 +172,8 @@
     void _emit_if_statement(string val1, string relop, string val2, string goto_offset);
 
     void emit_matrix_printing(YYSTYPE matrix);
+    
+    void emit_input(int dest_stack_offset);
 %}
 
 	/*******************************
@@ -234,14 +236,18 @@ S				:	EnterScope Stmt {
 				;
  
 Stmt			:	TYPE Init InitIter SC {
-						
+                        $$.next_list = list<int>();
 					}
 				|	Lvalue ASSIGN Exp SC {
 						assert_type_match($1, $3, '=');
 						if ($1.is_matrix) {
 							assert_matrices_of_same_dimensions($1, $3);
 						}
-					}
+                    
+                        // TODOGALY: emit
+
+                        $$.next_list = list<int>();
+                    }
 				|	PRINT OutputSpecifier SC {
 						if ($2.is_string)
 						{
@@ -256,23 +262,26 @@ Stmt			:	TYPE Init InitIter SC {
                                 emit_matrix_printing($2);
 							}
 						}
-					}
+                    
+                        $$.next_list = list<int>();
+                    }
 				|	READ ID SC {
 						$$ = assert_declared_and_fetch($2.name);
 						if (!$$.is_matrix) {
-							emit("input " + s($$.stack_offset));
+                            emit_input($$.stack_offset);
 						}
 						else {
 							for (int row = 0; row < $$.rows; ++row)
 							{
 								for (int col = 0; col < $$.cols; ++col)
 								{
-									int stack_offset = $$.stack_offset + row * $$.cols + col;
-									emit("input " + s(stack_offset));
-								}
+									emit_input($$.stack_offset + row * $$.cols + col);
+                            	}
 							}
 						}
-					}
+					
+                        $$.next_list = list<int>();
+                    }
 				|	IF LP Bool RP EnterScope SaveAddress Stmt %prec IF {
                         bp($3.true_list, $6.buffer_offset);
                         $$.next_list = merge($3.false_list, $7.next_list);
@@ -282,7 +291,7 @@ Stmt			:	TYPE Init InitIter SC {
 				|	IF LP Bool RP EnterScope SaveAddress Stmt ELSE PutGoto ExitScope EnterScope SaveAddress Stmt {
                         bp($3.true_list, $6.buffer_offset);
                         bp($3.false_list, $12.buffer_offset);
-                        $$.next_list = merge($7.false_list, $13.next_list);
+                        $$.next_list = merge($7.next_list, $13.next_list);
                         $$.next_list = merge($$.next_list, $9.next_list);
 
                         exit_scope();
@@ -310,8 +319,8 @@ Stmt			:	TYPE Init InitIter SC {
 						assert_matrix($3);
 
                         // *** Backpatching: ***
-                        bp($8.next_list, next()); // Stmt's next_list
-                        bp($6.next_list, next() + matrix_size); // PutGoto's next_list 
+                        bp($8.next_list, next()); // Backpatching Stmt's next_list
+                        bp($6.next_list, next() + matrix_size); // Backpatching PutGoto's next_list 
 
                         // *** Emitting code: ***
 
@@ -354,8 +363,8 @@ Stmt			:	TYPE Init InitIter SC {
                         // *** Exiting scope: ***
                         exit_scope();
 					}
-				|	LC EnterScope Stmt IterStmts RC {
-					
+				|	LC EnterScope IterStmts RC {
+                        $$.next_list = $3.next_list;
 
                         exit_scope();
 					}
@@ -363,6 +372,7 @@ Stmt			:	TYPE Init InitIter SC {
 
 ForeachDeclareId 	:	FOREACH EnterScope LP ID {
                         // Declare ID, including setting ForeachDeclareId.stack_offset to ID's stack_offset
+                        // Not using declare function since there is no need to emit an initialization of ID.
                         
                         set_stype_to_int($$, $4.name, 0, false);
                         $$.stack_offset = newTemp();
@@ -406,11 +416,12 @@ ExitScope       :	{
                         exit_scope();
                     }
                 ;
-IterStmts		:	Stmt IterStmts {
-						
+IterStmts		:	Stmt SaveAddress IterStmts {
+                        bp($1.next_list, $2.buffer_offset);
+                        $$.next_list = $3.next_list;
 					}
-				|	{
-						
+				|	Stmt {
+                        $$.next_list = $1.next_list;
 					}
 				;
 
@@ -1298,4 +1309,9 @@ void emit_matrix_printing(YYSTYPE matrix)
         }
     }
     emit("printLn ]");
+}
+
+void emit_input(int dest_stack_offset)
+{
+    emit("input " + s(dest_stack_offset));
 }

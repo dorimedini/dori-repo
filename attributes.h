@@ -44,7 +44,12 @@ typedef struct {
 	int stack_offset;	// For use in the symbol table, to find s[i]'s index
 	
 	// Not in use in the symbol table (nodes only):
-	list<int> next_list, true_list, false_list;
+	
+    // For Stmt and PutGoto nodes only
+    list<int> next_list;
+    // For Bool nodes only
+    list<int> true_list, false_list;
+    
 	int buffer_offset;	// For use with SaveAddress
 } STYPE;
 
