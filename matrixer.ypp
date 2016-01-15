@@ -145,7 +145,11 @@
 	
 	// Adds a temporary variable into the symbol table, so we can pop it later automatically
 	// using exit_scope()
-	void put_temp_in_symbol_table(YYSTYPE& stype);
+	// If requested, this function will also advance the stack pointer by the amount needed to store
+	// the temporary variable in memory.
+	// IMPORTANT: For this to work, the STYPE parameter must have valid is_matrix, rows and cols
+	// fields. If allocation isn't requested, the stack_offset field must also be valid.
+	void put_temp_in_symbol_table(YYSTYPE& stype, bool allocate);
 
     void emit_if_statement(string val1, string relop, string val2);
 
@@ -1167,8 +1171,18 @@ int get_stack_offset(const string& name) {
 }
 
 // Adds a temporary variable into the symbol table, so we can pop it later automatically
-// using exit_scope()
-void put_temp_in_symbol_table(YYSTYPE& stype) {
+// using exit_scope().
+// If requested, this function will also advance the stack pointer by the amount needed to store
+// the temporary variable in memory.
+// IMPORTANT: For this to work, the STYPE parameter must have valid is_matrix, rows and cols
+// fields. If allocation isn't requested, the stack_offset field must also be valid.
+void put_temp_in_symbol_table(YYSTYPE& stype, bool allocate) {
+	if (allocate) {
+		stype.stack_offset = (newTemp());
+		if (stype.is_matrix) {
+			stack_advance(stype.rows*stype.cols - 1);
+		}
+	}
 	stype.name = s(stype.stack_offset);
 	symbol_table.back()[stype.name] = stype;
 }
@@ -1177,3 +1191,13 @@ void emit_if_statement(string val1, string relop, string val2)
 {
     emit("if " + val1 + " " + relop + " " + val2 + " goto ");
 }
+
+
+
+
+
+
+
+
+
+

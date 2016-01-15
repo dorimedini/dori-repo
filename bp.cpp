@@ -53,3 +53,7 @@ void pop_stack(int x) {
 	sp -= x;
 }
 
+void stack_advance(int d) {
+	sp += d;
+}
+
