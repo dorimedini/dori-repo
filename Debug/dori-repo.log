@@ -1,8 +1,0 @@
-﻿Build started 15/1/2016 13:26:18 PM.
-     1>Project "C:\Users\t-gamilm\Google Drive\degree\sem7\compilation\hw\hw5\dori-repo\dori-repo.vcxproj" on node 2 (Build target(s)).
-     1>C:\Program Files (x86)\MSBuild\Microsoft.Cpp\v4.0\V120\Microsoft.MakeFile.Targets(37,5): warning MSB8005: The property 'NMakeBuildCommandLine' doesn't exist.  Skipping...
-     1>Done Building Project "C:\Users\t-gamilm\Google Drive\degree\sem7\compilation\hw\hw5\dori-repo\dori-repo.vcxproj" (Build target(s)).
-
-Build succeeded.
-
-Time Elapsed 00:00:00.45
