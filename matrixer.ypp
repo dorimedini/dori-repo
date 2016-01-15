@@ -136,7 +136,7 @@
 	*******************************/
 
 %token LP RP LC RC LB RB SC TYPE ID NUM
-%token LEQ GEQ LESS GREATER EQ NEQ PRINT READ STRING TRUE FALSE WHILE FOREACH
+%token RELOP PRINT READ STRING TRUE FALSE WHILE FOREACH
  // Assignment is right-associative: a=b=c ==> a=(b=c)
 %right ASSIGN
  // The comma sign needs to be associative: int a,b,c ==> int (a,b),c
@@ -538,23 +538,8 @@ Lvalue			:	ID {
 					}
 				;
 				
-Bool			:	Exp LEQ Exp {
-						
-					}
-				|	Exp GEQ Exp {
-					
-					}
-				|	Exp LESS Exp {
-					
-					}
-				|	Exp GREATER Exp {
-					
-					}
-				|	Exp EQ Exp {
-					
-					}
-				|	Exp NEQ Exp {
-					
+Bool			:	Exp RELOP Exp {
+					cout << $2.name << endl;
 					}
 				|	Exp IN Exp {
 					

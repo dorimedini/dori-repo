@@ -111,12 +111,12 @@ int|matrix				{
 							clear_unary_flag();
 							return ID;
 						}
-\<\=					{set_unary_flag(); return LEQ;}
-\>\=					{set_unary_flag(); return GEQ;}
-\<						{set_unary_flag(); return LESS;}
-\>						{set_unary_flag(); return GREATER;}
-\=\=					{set_unary_flag(); return EQ;}
-\!\=					{set_unary_flag(); return NEQ;}
+\<\=					{set_unary_flag(); yylval.name=yytext; return RELOP;}
+\>\=					{set_unary_flag(); yylval.name=yytext; return RELOP;}
+\<						{set_unary_flag(); yylval.name=yytext; return RELOP; }
+\>						{set_unary_flag(); yylval.name=yytext; return RELOP; }
+\=\=					{set_unary_flag(); yylval.name=yytext; return RELOP;}
+\!\=					{set_unary_flag(); yylval.name=yytext; return RELOP;}
 \&\&					{set_unary_flag(); return AND;}
 \|\|					{set_unary_flag(); return OR;}
 \!						{set_unary_flag(); return NOT;}
