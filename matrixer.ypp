@@ -122,6 +122,8 @@
 	// Calculates is_matrix and is_int_const, and the rows/columns if is_matrix=true.
 	// ASSUMES MULTIPLICATION IS LEGAL!
 	YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+	// Transposes a matrix (allocates memory for the transposed matrix)
 	YYSTYPE transpose(const YYSTYPE& op);
 	
 	// Takes care of scope cleanup.
@@ -574,7 +576,16 @@ Exp				:	Exp PLUS Exp {
 						// Exp to non-constant. Make sure ID.name has been declared!
 						// Let Exp equal the value of the symbol, using the symbol table.
 						$$ = assert_declared_and_fetch($1.name);
-						// No need to create a new temporary variable
+						// Need to create a temporary variable here, because if we do this:
+						// int x;
+						// matrix m(1,2)=[x,x];
+						// We need m to have it's own 2 slots of memory. The derivation looks like:
+						// Mat : [Exp,Exp] : [ID,ID]
+						// and Mat simply gets the stack offset of the first Exp as it's offset, so
+						// ALL Exps need their own offsets in this case.
+						int ID_offset = $$.stack_offset;
+						put_temp_in_symbol_table($$, true);
+						EMIT_OS(os, s($$.stack_offset) << "=" << s(ID_offset));
 					}
 				|	LP Exp RP {
 						// Copy the data from the Exp on the right side of the
