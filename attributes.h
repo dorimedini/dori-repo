@@ -15,6 +15,8 @@
 		} while(0)
 #endif
 
+#define PRINT_DEBUG(stream) DO_DEBUG(cout << stream);
+
 #include <vector>
 #include <string>
 #include <list>
