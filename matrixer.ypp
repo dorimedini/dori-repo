@@ -1112,16 +1112,21 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 YYSTYPE transpose(const YYSTYPE& matrix_op)
 {
 	YYSTYPE transposed;
+	
+	// Update internal data
 	set_stype_to_matrix(transposed, "", 
 		matrix_op.cols, matrix_op.rows, 
 		vector< vector<int> >());
-		
 	transposed.matrix.resize(transposed.rows, vector<int>(transposed.cols, 0));
-	for (int i = 0; i < matrix_op.rows; ++i)
-	{
-		for (int j = 0; j < matrix_op.cols; ++j)
-		{
-			transposed.matrix[j][i] = matrix_op.matrix[i][j];
+	
+	// Allocate memory
+	put_temp_in_symbol_table(transposed, true);
+	
+	// Generate code
+	for (int i = 0; i < matrix_op.rows; ++i) {
+		for (int j = 0; j < matrix_op.cols; ++j) {
+			EMIT_OS(os, s(transposed.stack_offset + j*transposed.cols + i) << "=" <<
+						s(matrix_op.stack_offset + i*matrix_op.cols + j));
 		}
 	}
 	
