@@ -1055,8 +1055,7 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 // Add the two values (matrix or not).
 // Assume addition is allowed! Error handling should be done in the semantic analysis!
 YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
-	YYSTYPE sum;
-	sum.is_matrix = op1.is_matrix; // Assuming op1.is_matrix == op2.is_matrix
+	YYSTYPE sum = op1;				// Basic data - rows, columns, is_matrix, is_int_const... etc
 	sum.stack_offset = newTemp();
 	if (op1.is_matrix) {
 		pop_stack(1);	// To align sum's stack_offset field with the following loop
