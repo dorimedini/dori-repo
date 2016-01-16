@@ -365,7 +365,26 @@ Stmt			:	TYPE Init InitIter SC {
 
                             emit_if_statement(loop_counter, "==", i_str, goto_offset);
                             // We've added an if statement, so the next goto has one less statement to jump over.
-                            goto_offset -= 1;
+							
+							// No, we'll always have this:
+							// if <> goto A
+							// if <> goto B
+							// ...
+							// if <> goto Z
+							// goto END
+							// s[ID]=s[MatrixCellA]
+							// s[Counter]=s[Counter]+1
+							// goto UP
+							// s[ID]=s[MatrixCellB]
+							// s[Counter]=s[Counter]+1
+							// goto UP
+							// ...
+							// s[ID]=s[MatrixCellZ]
+							// s[Counter]=s[Counter]+1
+							// goto UP
+							// Anyway, always jump exactly 3 statements.
+							
+							// goto_offset -= 1;
                         }
                         
                         $$.next_list = makelist(next());
