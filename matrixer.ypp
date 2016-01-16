@@ -543,7 +543,8 @@ Exp				:	Exp PLUS Exp {
 						// Set the left Exp's is_int_const field to the AND operation between the
 						// is_int_const fields of the two right-side Exps.
 						assert_type_match($1,$3,'/');
-						assert_non_zero($3.value);
+						if ($3.is_int_const)
+							assert_non_zero($3.value);
 						// Update internal compiler data
 						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
 						put_temp_in_symbol_table($$, true);
