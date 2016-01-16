@@ -1141,7 +1141,7 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 		for (int i=0; i<product.rows; ++i) {
 			for (int j=0; j<product.cols; ++j) {
 				EMIT_OS(s(newTemp()) << "="
-										<< s(matrix_offset + i*product.rows + j) << "*"
+										<< s(matrix_offset + i*product.cols + j) << "*"
 										<< s_multiplier);
 			}
 		}
