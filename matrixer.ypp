@@ -571,7 +571,10 @@ Exp				:	Exp PLUS Exp {
 						set_stype_to_int($$, "", result, ($1.is_int_const && $3.is_int_const));
 						put_temp_in_symbol_table($$, true);
 						// Output code
-						EMIT_OS(s($$.stack_offset) << "=" << $1.name << "/" << $3.name);
+						ostringstream op1,op2;
+						$1.is_int_const ? (op1 << $1.value) : (op1 << s($1.stack_offset));
+						$3.is_int_const ? (op2 << $3.value) : (op2 << s($3.stack_offset));
+						EMIT_OS(s($$.stack_offset) << "=" << op1.str() << "/" << op2.str());
 					}
 				|	UNARY_MINUS Exp {
 						// Negate the value (may be a matrix!).
