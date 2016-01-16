@@ -521,11 +521,9 @@ Exp				:	Exp PLUS Exp {
 						// been declared.
 						// Set the left Exp's is_int_const field to the AND operation between the
 						// is_int_const fields of the two right-side Exps.
-						DO_DEBUG(cout << "multiplying... ");
 						assert_type_match($1,$3,'*');	// This should always be OK...
 						assert_multiplicative($1,$3);
 						$$ = mul($1,$3);
-						DO_DEBUG(cout << "multiplied" << endl);
 					}
 				|	Exp DIV Exp {
 						// Make sure neither is a matrix, and calculate the value.
@@ -569,8 +567,6 @@ Exp				:	Exp PLUS Exp {
 						// Let Exp equal the value of the symbol, using the symbol table.
 						$$ = assert_declared_and_fetch($1.name);
 						// No need to create a new temporary variable
-						DO_DEBUG(if ($$.is_int_const != false) cout << 
-							"ERROR: ID's is_int_const is not set to false!" << endl;);
 					}
 				|	LP Exp RP {
 						// Copy the data from the Exp on the right side of the
