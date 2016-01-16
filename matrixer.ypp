@@ -585,7 +585,17 @@ Exp				:	Exp PLUS Exp {
 						// ALL Exps need their own offsets in this case.
 						int ID_offset = $$.stack_offset;
 						put_temp_in_symbol_table($$, true);
-						EMIT_OS(os, s($$.stack_offset) << "=" << s(ID_offset));
+						if ($$.is_matrix) {
+							for (int i=0; i<$$.rows; ++i) {
+								for (int j=0; j<$$.cols; ++j) {
+									EMIT_OS(s($$.stack_offset + i*$$.cols + j) << "=" <<
+												s(ID_offset + i*$$.cols + j));
+								}
+							}
+						}
+						else {
+							EMIT_OS(s($$.stack_offset) << "=" << s(ID_offset));
+						}
 					}
 				|	LP Exp RP {
 						// Copy the data from the Exp on the right side of the
