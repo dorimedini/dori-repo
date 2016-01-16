@@ -601,20 +601,24 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 						// Make sure Exp is either declared or constant.
 						// For detailed comments, see MatSecondIter.
 						assert_scalar($2);
+
 						if ($4.rows != 0)
 							assert_column_match($3.cols+1,$4.cols);
 						set_stype_to_matrix($$, "", $4.rows+1, $3.cols+1,
 							vector< vector<int> >());
-						$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
-						// Update the first row:
-						$$.matrix[0][0] = $2.value;
-						for(int i=1; i<$$.cols; ++i) {
-							$$.matrix[0][i] = $3.matrix[0][i-1];
-						}
-						// Update the rest, row by row
-						for (int i=1; i<$$.rows; ++i) {
-							$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
-						}
+
+                        put_temp_in_symbol_table($$, true);
+
+						//$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
+						//// Update the first row:
+						//$$.matrix[0][0] = $2.value;
+						//for(int i=1; i<$$.cols; ++i) {
+						//	$$.matrix[0][i] = $3.matrix[0][i-1];
+						//}
+						//// Update the rest, row by row
+						//for (int i=1; i<$$.rows; ++i) {
+						//	$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
+						//}
 					}
 				|	TRANSPOSE LP Mat RP {
 						// Transpose.
@@ -631,7 +635,7 @@ Mat				:	LB Exp MatFirstIter MatSecondIter RB {
 MatFirstIter	:	CS Exp MatFirstIter {
 						// Make sure the expression is a number.
 						assert_scalar($2);
-						// We need to somehow record the number of columns created
+                        // We need to somehow record the number of columns created
 						// while iterating over this variable, s.t. the SecondIter
 						// variable will know how many columns must exist in each
 						// row.
@@ -639,11 +643,12 @@ MatFirstIter	:	CS Exp MatFirstIter {
 						set_stype_to_matrix($$, "", 
 							1, $3.cols+1, 
 							vector< vector<int> >());
-						$$.matrix.resize($$.rows,vector<int>($$.cols,0));
+                        
+                        /*$$.matrix.resize($$.rows,vector<int>($$.cols,0));
 						$$.matrix[0][0] = $2.value;
 						for(int i=1; i<$$.cols; ++i) {
 							$$.matrix[0][i] = $3.matrix[0][i-1];
-						}
+						}*/
 					}
 				|	{
 						// Set rows and columns to zero (recursion base).
@@ -676,19 +681,20 @@ MatSecondIter	:	SC Exp MatFirstIter MatSecondIter {
 						// recursion logic so we should set the number of columns now.
 						if ($4.rows != 0)
 							assert_column_match($3.cols+1,$4.cols);
+                        // TODO: Is it fine to pass a local instance of vector as the matrix argument?
 						set_stype_to_matrix($$, "", 
 							$4.rows+1, $3.cols+1,
 							vector< vector<int> >());
-						$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
-						// Update the first row:
-						$$.matrix[0][0] = $2.value;
-						for(int i=1; i<$$.cols; ++i) {
-							$$.matrix[0][i] = $3.matrix[0][i-1];
-						}
-						// Update the rest, row by row
-						for (int i=1; i<$$.rows; ++i) {
-							$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
-						}
+						//$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
+						//// Update the first row:
+						//$$.matrix[0][0] = $2.value;
+						//for(int i=1; i<$$.cols; ++i) {
+						//	$$.matrix[0][i] = $3.matrix[0][i-1];
+						//}
+						//// Update the rest, row by row
+						//for (int i=1; i<$$.rows; ++i) {
+						//	$$.matrix[i] = $4.matrix[i-1];	// Copy the row vector directly
+						//}
 					}
 				|	{
 						// Set the number of rows to zero, so the above iterations know we stopped
@@ -978,6 +984,8 @@ void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols,
 	stype.cols = cols;
 	stype.matrix = matrix;
 	stype.name = name;
+
+    //TODO: Should we set stype.is_int_const to false?
 }
 
 // Negate the value of the input, whether it's a scalar or matrix.
