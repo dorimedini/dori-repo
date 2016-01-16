@@ -122,8 +122,6 @@
 	// Calculates is_matrix and is_int_const, and the rows/columns if is_matrix=true.
 	// ASSUMES MULTIPLICATION IS LEGAL!
 	YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2);
-	YYSTYPE raise_matrix_to_power(const YYSTYPE& matrix_op, 
-		const YYSTYPE& exponent_op);
 	YYSTYPE transpose(const YYSTYPE& op);
 	
 	// Takes care of scope cleanup.
@@ -1110,21 +1108,7 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 	return product;
 }
 
-YYSTYPE raise_matrix_to_power(const YYSTYPE& matrix_op, const YYSTYPE& exponent_op)
-{
-	YYSTYPE power;
-	
-	set_stype_to_matrix(power, "", 
-		matrix_op.rows, matrix_op.cols, 
-		matrix_op.matrix);
-	for (int i = 1; i < exponent_op.value; ++i) 
-	{
-		power = mul(power, matrix_op);
-	}
-	
-	return power;
-}
-
+// Transposes a matrix (allocates memory for the transposed matrix)
 YYSTYPE transpose(const YYSTYPE& matrix_op)
 {
 	YYSTYPE transposed;
