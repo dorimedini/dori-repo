@@ -829,6 +829,7 @@ OutputSpecifier :	ID {
 
 int main() {
 	yyparse();
+	printBuffer();
 }
 
 int yyerror(char const* message) {

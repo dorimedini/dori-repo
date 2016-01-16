@@ -2,7 +2,7 @@
 #define __ATTRIBUTES_H
 
 /** TODO: REMOVE THIS BEFORE SUBMITTION (SET DEBUG TO 0)! */
-#define DEBUG 1
+#define DEBUG 0
 #if DEBUG
 	#define DO_DEBUG(code) do { \
 			code; \
