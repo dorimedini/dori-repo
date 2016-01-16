@@ -95,13 +95,14 @@
 	
 	// Instead of writing:
 	// ostringstream os;
-	// os << long << "and" << boring << s(stream);
+	// os << long << "and" << boring << string(stream);
 	// emit(os.str());
 	// Just use the macro!
-	#define EMIT_OS(os,stream) \
+	#define EMIT_OS(stream) do { \
 			ostringstream os; \
 			os << stream; \
-			emit(os.str())
+			emit(os.str()); \
+		} while(0)
 	
 	void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const);
 
@@ -318,7 +319,7 @@ Stmt			:	TYPE Init InitIter SC {
                         
                         bp($8.next_list, $2.buffer_offset);
 
-                        EMIT_OS(os, "goto " << $2.buffer_offset);
+                        EMIT_OS("goto " << $2.buffer_offset);
 
                         $$.next_list = $4.false_list;
 
@@ -374,7 +375,7 @@ Stmt			:	TYPE Init InitIter SC {
                         {
                             emit(iterating_element + "=" + s(matrix.stack_offset + i));
                             emit(loop_counter + "=" + loop_counter + "+1");
-                            EMIT_OS(os, "goto " << stmt_buffer_offset);
+                            EMIT_OS("goto " << stmt_buffer_offset);
                         }
 
                         // *** Exiting scope: ***
@@ -409,7 +410,7 @@ ForeachDeclareLoopCounter: {
                         put_temp_in_symbol_table($$, true);
 
                         // Output code
-                        EMIT_OS(os, s($$.stack_offset) << "=" << 0);
+                        EMIT_OS(s($$.stack_offset) << "=" << 0);
                     }
                 ;
 
@@ -547,7 +548,7 @@ Exp				:	Exp PLUS Exp {
 						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
 						put_temp_in_symbol_table($$, true);
 						// Output code
-						EMIT_OS(os, s($$.stack_offset) << "=" << $1.name << "/" << $3.name);
+						EMIT_OS(s($$.stack_offset) << "=" << $1.name << "/" << $3.name);
 					}
 				|	UNARY_MINUS Exp {
 						// Negate the value (may be a matrix!).
@@ -569,7 +570,7 @@ Exp				:	Exp PLUS Exp {
 						set_stype_to_int($$, "", $1.value, true);
 						put_temp_in_symbol_table($$, true);
 						// Output code
-						EMIT_OS(os, s($$.stack_offset) << "=" << $1.value);
+						EMIT_OS(s($$.stack_offset) << "=" << $1.value);
 					}
 				|	ID {
 						// All IDs have values, types etc. Copy them, and set
@@ -1016,13 +1017,13 @@ YYSTYPE negate_value(const YYSTYPE& stype) {
 		pop_stack(1);	// In the loop we use s(newTemp()) always, so bring the sp back one cell
 		for (int i=0; i<stype.rows; ++i) {	// before the loop starts
 			for (int j=0; j<stype.cols; ++j) {
-				EMIT_OS(os, s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j));
+				EMIT_OS(s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j));
 			}
 		}
 	}
 	else {
 		negated.value = -stype.value; // In case this is a const int
-		EMIT_OS(os, s(negated.stack_offset) << "=0-" << s(stype.stack_offset));
+		EMIT_OS(s(negated.stack_offset) << "=0-" << s(stype.stack_offset));
 	}
 	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
 	// used.
@@ -1040,7 +1041,7 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 		pop_stack(1);	// To align sum's stack_offset field with the following loop
 		for (int i=0; i<op1.rows; ++i) {
 			for (int j=0; j<op1.cols; ++j) {
-				EMIT_OS(os, s(newTemp()) << "="
+				EMIT_OS(s(newTemp()) << "="
 						<< s(op1.stack_offset+i*op1.cols+j) << "+" 
 						<< s(op2.stack_offset+i*op1.cols+j));
 			}
@@ -1049,7 +1050,7 @@ YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
 	else {
 		sum.is_int_const = (op1.is_int_const && op2.is_int_const);
 		sum.value = op1.value + op2.value;	// May be garbage, but if sum.is_int_const then it's not
-		EMIT_OS(os, s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset));
+		EMIT_OS(s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset));
 	}
 	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
 	// used.
@@ -1085,10 +1086,10 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 				string cell_location = s(newTemp());
 				emit(cell_location + "=0");
 				for (int k=0; k<op1.cols; ++k) {
-					EMIT_OS(os1, s_temp << "="
+					EMIT_OS(s_temp << "="
 									<< s(op1.stack_offset + row*op1.cols + k) << "*"
 									<< s(op2.stack_offset + k*op2.cols + col));
-					EMIT_OS(os2, cell_location << "=" << cell_location << "+" << s_temp);
+					EMIT_OS(cell_location << "=" << cell_location << "+" << s_temp);
 				}
 			}
 		}
@@ -1113,7 +1114,7 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 		// Output the product calculation code
 		for (int i=0; i<product.rows; ++i) {
 			for (int j=0; j<product.cols; ++j) {
-				EMIT_OS(os, s(newTemp()) << "="
+				EMIT_OS(s(newTemp()) << "="
 										<< s(matrix_offset + i*product.rows + j) << "*"
 										<< s_multiplier);
 			}
@@ -1121,7 +1122,7 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 	}
 	else {
 		product.value = op1.value * op2.value;
-		EMIT_OS(os, s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset));
+		EMIT_OS(s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset));
 	}
 	// Add to the symbol table (so we can pop it later)
 	put_temp_in_symbol_table(product, false);
@@ -1145,7 +1146,7 @@ YYSTYPE transpose(const YYSTYPE& matrix_op)
 	// Generate code
 	for (int i = 0; i < matrix_op.rows; ++i) {
 		for (int j = 0; j < matrix_op.cols; ++j) {
-			EMIT_OS(os, s(transposed.stack_offset + j*transposed.cols + i) << "=" <<
+			EMIT_OS(s(transposed.stack_offset + j*transposed.cols + i) << "=" <<
 						s(matrix_op.stack_offset + i*matrix_op.cols + j));
 		}
 	}
@@ -1336,17 +1337,17 @@ void emit_matrix_construction(YYSTYPE& target, YYSTYPE& first_cell, YYSTYPE& fir
 	// needed to create the full matrix.
 	
 	// Update the first cell (0,0) from Exp:
-	EMIT_OS(os1, s(target.stack_offset) << "=" << s(first_cell.stack_offset));
+	EMIT_OS(s(target.stack_offset) << "=" << s(first_cell.stack_offset));
 	
 	// Update the first row (0,[1-n]) using MatFirstIter:
 	for (int i=1; i<target.cols; ++i) {
-		EMIT_OS(os, s(target.stack_offset+i) << "=" << s(first_row.stack_offset+i-1));
+		EMIT_OS(s(target.stack_offset+i) << "=" << s(first_row.stack_offset+i-1));
 	}
 	
 	// Update the rest using MatSecondIter:
 	for (int i=1; i<target.rows; ++i) {
 		for (int j=0; j<target.cols; ++j) {
-			EMIT_OS(os, s(target.stack_offset + i*target.cols + j) << "="
+			EMIT_OS(s(target.stack_offset + i*target.cols + j) << "="
 					<< s(rest_of_matrix.stack_offset + (i-1)*target.cols + j));
 		}
 	}
