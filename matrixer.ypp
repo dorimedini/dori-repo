@@ -1142,6 +1142,8 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 		s[i]=s[j]*-1
 		That's illegal! We need to make room for the multiplier first...
 		
+		IN GENERAL: See the TODO file.
+		
 		ostringstream s_multiplier;
 		if (op1.is_matrix)
 			op2.is_int_const ? (s_multiplier << op2.value) : (s_multiplier << s(op2.stack_offset));
