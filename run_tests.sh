@@ -20,8 +20,8 @@ for i in `ls $testdir/examples/ | grep -iP 'example\d+.matrix' | sort -n -t_ -k2
 	if [ 0 -lt `cat $testdir/examples/$i.quads | grep ERROR | wc -l` ]; then
 		cat $testdir/examples/$i.quads > $testdir/examples/$i.our_out
 	else
-		# There may be input
-		if [ 0 -lt `ls $testdir/examples/$i.input | wc -l` ]; then
+		# There may be input. Look for $i.input file
+		if [ 0 -lt `ls $testdir/examples/$i* | grep input | wc -l` ]; then
 			./bvm.pl $testdir/examples/$i.quads < $testdir/examples/$i.input > $testdir/examples/$i.our_out
 		else
 			./bvm.pl $testdir/examples/$i.quads > $testdir/examples/$i.our_out
