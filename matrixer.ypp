@@ -1375,7 +1375,7 @@ void emit_matrix_construction(YYSTYPE& target, YYSTYPE& first_cell, YYSTYPE& fir
 
 void emit_matrix_printing(YYSTYPE matrix)
 {
-    emit("print [");
+    emit("print \"[\"");
     for (int row = 0; row < matrix.rows; ++row)
     {
         for (int col = 0; col < matrix.cols; ++col)
@@ -1383,14 +1383,14 @@ void emit_matrix_printing(YYSTYPE matrix)
             int stack_offset = matrix.stack_offset + row * matrix.cols + col;
             emit("print " + s(stack_offset));
             if (col < matrix.cols - 1) {
-                emit("print ,");
+                emit("print \",\"");
             }
         }
         if (row < matrix.rows - 1) {
-            emit("print ;");
+            emit("print \";\"");
         }
     }
-    emit("printLn ]");
+    emit("printLn \"]\"");
 }
 
 void emit_input(int dest_stack_offset)
