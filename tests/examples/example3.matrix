@@ -1,0 +1,10 @@
+{
+	matrix m(2,2);
+	int x=1;
+	m = [x,x+1;x+2,x+3];
+	print m;
+	print "Enter 4 items for m:";
+	read m;      
+	matrix t(2,2) = m+m;
+	print t;
+}
