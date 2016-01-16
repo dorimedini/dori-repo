@@ -1,7 +1,30 @@
 #!/bin/bash
 
+# TO USE:
+# This script (run_tests.sh) expects this hierarchy:
+# ./run_tests.sh
+# ./ex5.exe
+# ./tests/arithmetic
+# ./tests/example
+# And so on. You can change "tests/" to something else by changing $testdir.
+#
+# To run a specific test (for example, arithmetic18.matrix) just call the script like so:
+# ./run_tests.sh arithmetic 18
+
 # Testing directory
 testdir="tests"
+
+# Define custom test types
+test_types=(
+	"example"
+	"declarations" 
+	"declaration_scoping"
+	"other_scoping"
+	"arithmetic"
+	"stack_reuse"
+	"conditionals"
+	"loops"
+)
 
 # Rebuild the program
 make clean
@@ -55,16 +78,6 @@ function run_test {
 		do_test $1 $i
 	done
 }
-
-# Define custom test types
-test_types=(
-	"example"
-	"declarations" 
-	"declaration_scoping"
-	"other_scoping"
-	"arithmetic"
-	"stack_reuse"
-)
 
 # If asked by the user, run only a specific test:
 if [ -n "$1" ]; then
