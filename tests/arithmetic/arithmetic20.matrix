@@ -1,0 +1,20 @@
+{
+	int a = 2;
+	int b = 5;
+	int x;
+
+	// Unary minus comes before arithmetic operations
+	x=a + -b;
+	print x;
+	x=a + --b;
+	print x;
+	x=a + ---b;
+	print x;
+	x=b / -a;
+	print x;
+	x=b / --a;
+	print x;
+	x=b / ---a;
+	print x;
+		
+}

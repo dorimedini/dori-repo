@@ -1,0 +1,17 @@
+{
+	int a = 2;
+	int b = 5;
+	int x;
+
+	// Multiplication and division go before addition and subtraction
+	x=a - a*b;
+	print x;
+	x=b + b/b;
+	print x;
+	x=a * b / a;
+	print x;
+	x=a / a * b;
+	print x;
+
+		
+}
