@@ -1,0 +1,7 @@
+s[0]=0
+s[1]=1
+s[2]=s[1]
+s[3]=0
+printLn s[0]
+printLn s[2]
+printLn s[3]

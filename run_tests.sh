@@ -10,64 +10,74 @@ make
 # Unixify the test files
 find $testdir/ -type f -exec dos2unix -q {} \;
 
-# Run example tests
-echo "Running example tests:"
-for i in `ls $testdir/examples/ | grep -iP 'example\d+.matrix' | sort -n -t_ -k2 | cut -d. -f1`; do
-    echo -n "Running $i ... "
-	./ex5.exe < $testdir/examples/$i.matrix > $testdir/examples/$i.quads
+# Run one test
+function do_test {
+	echo -n "Running $2 ... "
+	./ex5.exe < $testdir/$1/$2.matrix > $testdir/$1/$2.quads
 	# If the tests should output an error, the 'quads' file is the output file.
 	# Don't try to run it through bvm.pl, it'll just output an empty file.
-	if [ 0 -lt `cat $testdir/examples/$i.quads | grep ERROR | wc -l` ]; then
-		cat $testdir/examples/$i.quads > $testdir/examples/$i.our_out
+	if [ 0 -lt `cat $testdir/$1/$2.quads | grep ERROR | wc -l` ]; then
+		cat $testdir/$1/$2.quads > $testdir/$1/$2.our_out
 	else
-		# There may be input. Look for $i.input file
-		if [ 0 -lt `ls $testdir/examples/$i* | grep input | wc -l` ]; then
-			./bvm.pl $testdir/examples/$i.quads < $testdir/examples/$i.input > $testdir/examples/$i.our_out
+		# There may be input. Look for $2.input file
+		if [ 0 -lt `ls $testdir/$1/$2* | grep input | wc -l` ]; then
+			./bvm.pl $testdir/$1/$2.quads < $testdir/$1/$2.input > $testdir/$1/$2.our_out
 		else
-			./bvm.pl $testdir/examples/$i.quads > $testdir/examples/$i.our_out
+			./bvm.pl $testdir/$1/$2.quads > $testdir/$1/$2.our_out
 		fi
 	fi
-    if diff $testdir/examples/$i.our_out $testdir/examples/$i.out > /dev/null; then
-        echo "PASSED"
-    else
+	if diff $testdir/$1/$2.our_out $testdir/$1/$2.out > /dev/null; then
+		echo "PASSED"
+	else
 		echo -e "\n====================================================================================="
-        echo "FAILED:"
+		echo "FAILED:"
 		echo "-------------------------------------------------------------------------------------"
 		echo "INPUT:"
 		echo "-------------------------------------------------------------------------------------"
-		cat $testdir/examples/$i.matrix
+		cat $testdir/$1/$2.matrix
 		echo -e "\n-------------------------------------------------------------------------------------"
 		echo "QUAD OUTPUT:"
 		echo "-------------------------------------------------------------------------------------"
-        cat $testdir/examples/$i.quads | nl
+		cat $testdir/$1/$2.quads | nl
 		echo "-------------------------------------------------------------------------------------"
 		echo "SDIFF:"
 		echo "-------------------------------------------------------------------------------------"
-        sdiff $testdir/examples/$i.our_out $testdir/examples/$i.out
+		sdiff $testdir/$1/$2.our_out $testdir/$1/$2.out
 		echo "-------------------------------------------------------------------------------------"
 		echo "====================================================================================="
-    fi
-done
+	fi
+}
+
+# Run example tests
+function run_test {
+	echo "Running $1 tests:"
+	for i in `ls $testdir/$1/ | grep -iP "$1\d+.matrix" | sort -n -t_ -k2 | cut -d. -f1`; do
+		do_test $1 $i
+	done
+}
 
 # Define custom test types
 test_types=(
+	"example"
 	"declarations" 
-	"matrix_declarations"
 	"declaration_scoping"
 	"other_scoping"
 	"arithmetic"
 	"stack_reuse"
 )
 
+# If asked by the user, run only a specific test:
+if [ -n "$1" ]; then
+	echo "*************************************************************************************"
+	do_test $1 "$1$2"
+	echo "*************************************************************************************"
+# Otherwise, run custom tests
+else
+	for test in ${test_types[@]}; do
+		echo "*************************************************************************************"
+		echo "*************************************************************************************"
+		echo "*************************************************************************************"
+		run_test $test
+	done
+fi
 
-#echo ""
-#echo "Running our tests:"
-#for i in `ls tests/ | grep -iP 'test_\d+.in' | sort -n -t_ -k2 | cut -d. -f1`; do
-#    echo -n "Running $i ... "
-#    if ./ex4.exe < tests/$i.in | diff - tests/$i.out > /dev/null; then
-#        echo "PASSED"
-#    else
-#        echo "FAILED:"
-#        ./ex4.exe < tests/$i.in | diff -y - tests/$i.out
-#    fi
-#done

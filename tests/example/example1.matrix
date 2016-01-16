@@ -1,0 +1,7 @@
+{
+int a = 7, sum = 0;
+foreach(x in [1,2;3,4])
+	sum = sum + x;
+print sum;
+print a;
+}

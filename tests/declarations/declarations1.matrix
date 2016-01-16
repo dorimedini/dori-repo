@@ -1,0 +1,6 @@
+{
+	int x,y=1,z;
+	print x;
+	print y;
+	print z;
+}

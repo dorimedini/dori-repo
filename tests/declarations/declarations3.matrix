@@ -1,0 +1,15 @@
+{
+	int x=1,y=2,z=3;
+	print x;
+	print y;
+	print z;
+	matrix m(1,2)=[x,x];
+	print m;
+	print x;
+	matrix k(2,2)=[x,x+y;x+z,x+y+z];
+	print k;
+	print m;
+	print x;
+	print y;
+	print z;
+}

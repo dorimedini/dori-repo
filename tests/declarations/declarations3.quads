@@ -1,0 +1,67 @@
+s[0]=1
+s[1]=s[0]
+s[2]=2
+s[3]=s[2]
+s[4]=3
+s[5]=s[4]
+printLn s[1]
+printLn s[3]
+printLn s[5]
+s[6]=1
+s[7]=2
+s[8]=s[1]
+s[9]=s[1]
+s[10]=s[9]
+s[11]=s[8]
+s[12]=s[10]
+s[13]=s[11]
+s[14]=s[12]
+print "["
+print s[13]
+print ","
+print s[14]
+printLn "]"
+printLn s[1]
+s[15]=2
+s[16]=2
+s[17]=s[1]
+s[18]=s[1]
+s[19]=s[3]
+s[20]=s[18]+s[19]
+s[21]=s[20]
+s[22]=s[1]
+s[23]=s[5]
+s[24]=s[22]+s[23]
+s[25]=s[1]
+s[26]=s[3]
+s[27]=s[25]+s[26]
+s[28]=s[5]
+s[29]=s[27]+s[28]
+s[30]=s[29]
+s[31]=s[24]
+s[32]=s[30]
+s[33]=s[17]
+s[34]=s[21]
+s[35]=s[31]
+s[36]=s[32]
+s[37]=s[33]
+s[38]=s[34]
+s[39]=s[35]
+s[40]=s[36]
+print "["
+print s[37]
+print ","
+print s[38]
+print ";"
+print s[39]
+print ","
+print s[40]
+printLn "]"
+print "["
+print s[13]
+print ","
+print s[14]
+printLn "]"
+printLn s[1]
+printLn s[3]
+printLn s[5]
