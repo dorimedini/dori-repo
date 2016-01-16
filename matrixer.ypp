@@ -1231,6 +1231,7 @@ YYSTYPE declare(string name, int value_or_offset, bool is_const) {
 YYSTYPE declare(string name, int rows, int cols) {
 	// Just use the other function, by sending an empty matrix (full of zeros)
 	YYSTYPE source;
+	source.is_matrix = true;
 	source.matrix.resize(rows, vector<int>(cols, 0));
 	source.rows = rows;
 	source.cols = cols;
