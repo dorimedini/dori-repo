@@ -562,10 +562,13 @@ Exp				:	Exp PLUS Exp {
 						// Set the left Exp's is_int_const field to the AND operation between the
 						// is_int_const fields of the two right-side Exps.
 						assert_type_match($1,$3,'/');
-						if ($3.is_int_const)
+						int result=0;	// Give some default value, in case the result isn't constant
+						if ($3.is_int_const) {
 							assert_non_zero($3.value);
-						// Update internal compiler data
-						set_stype_to_int($$, "", $1.value / $3.value, ($1.is_int_const && $3.is_int_const));
+							result = $1.value / $3.value;
+						}
+						// Update internal compiler data (use 'result' as the value)
+						set_stype_to_int($$, "", result, ($1.is_int_const && $3.is_int_const));
 						put_temp_in_symbol_table($$, true);
 						// Output code
 						EMIT_OS(s($$.stack_offset) << "=" << $1.name << "/" << $3.name);
