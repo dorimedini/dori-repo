@@ -570,11 +570,11 @@ Exp				:	Exp PLUS Exp {
 						// Update internal compiler data (use 'result' as the value)
 						set_stype_to_int($$, "", result, ($1.is_int_const && $3.is_int_const));
 						put_temp_in_symbol_table($$, true);
+						
 						// Output code
-						ostringstream op1,op2;
-						$1.is_int_const ? (op1 << $1.value) : (op1 << s($1.stack_offset));
-						$3.is_int_const ? (op2 << $3.value) : (op2 << s($3.stack_offset));
-						EMIT_OS(s($$.stack_offset) << "=" << op1.str() << "/" << op2.str());
+						EMIT_OS(s($$.stack_offset) << "=" << 
+								s($1.stack_offset) << "/" <<
+								s($3.stack_offset));
 					}
 				|	UNARY_MINUS Exp {
 						// Negate the value (may be a matrix!).
@@ -589,7 +589,7 @@ Exp				:	Exp PLUS Exp {
 						// reduction to Mat.
 						$$ = $1;
 						// All relevant fields will be correctly copied (no need to create a new
-						// temporary variable in the code).
+						// temporary variable in the code). No need for more memory allocation.
 					}
 				|	NUM {
 						// Update internal compiler data
@@ -630,7 +630,9 @@ Exp				:	Exp PLUS Exp {
 						// Set the left Exp's is_int_const field to the 
 						// is_int_const field of the right-side Exp.
 						$$ = $2;
-						// No need to create a new temporary variable
+						// No need to create a new temporary variable. Use the exact same memory
+						// location in the stack for both the left Exp and the right Exp in the 
+						// parenthesis.
 					}
 				|	ID LB Exp CS Exp RB {
 						handle_matrix_dereference($$, $1.name, $3, $5);
@@ -1127,39 +1129,26 @@ YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
 	else if (op1.is_matrix || op2.is_matrix) {
 		// Here, just emit code that multiplies the expression with each matrix cell.
 		// Get the stack location of the matrix:
-		int matrix_offset;
+		int matrix_offset, multiplier_offset;
 		if (op1.is_matrix) {
 			matrix_offset = op1.stack_offset;
 			product.rows = op1.rows;
 			product.cols = op1.cols;
+			multiplier_offset = op2.stack_offset;
 		}
 		else {
 			matrix_offset = op2.stack_offset;
 			product.rows = op2.rows;
 			product.cols = op2.cols;
+			multiplier_offset = op1.stack_offset;
 		}
-		// Get the stack location of the multiplier:
-		THIS NEEDS TO BE FIXED!
-		If the multiplier is a constant negative value, say -1,
-		we try to output:
-		s[i]=s[j]*-1
-		That's illegal! We need to make room for the multiplier first...
-		
-		IN GENERAL: See the TODO file.
-		
-		ostringstream s_multiplier;
-		if (op1.is_matrix)
-			op2.is_int_const ? (s_multiplier << op2.value) : (s_multiplier << s(op2.stack_offset));
-		else
-			op1.is_int_const ? (s_multiplier << op1.value) : (s_multiplier << s(op1.stack_offset));
-		PRINT_DEBUG("The multiplier is " << s_multiplier.str() << endl);
 		// Output the product calculation code
 		for (int i=0; i<product.rows; ++i) {
 			for (int j=0; j<product.cols; ++j) {
 				
 				EMIT_OS(s(newTemp()) << "="
 										<< s(matrix_offset + i*product.cols + j) << "*"
-										<< s_multiplier.str());
+										<< s(multiplier_offset));
 			}
 		}
 	}
