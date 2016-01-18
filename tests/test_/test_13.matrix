@@ -1,0 +1,4 @@
+// Test initializations
+{
+    int a = a[2, 2];
+}

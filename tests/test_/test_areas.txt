@@ -1,0 +1,13 @@
+[10-29, 80-84] Initializations
+[50-50] Assignments
+[86] Print, Read
+[41-44] Scopes
+    Outer scope can contain only 1 statement
+[90] While, For each
+    (Also test them nested)
+[31-39] Boolean conditions
+[85] Arithmetic operations
+    Matrix arithmetic operations
+    Int arithmetic operations
+Matrix specific operations
+    Transpose, Individual element access

@@ -1,0 +1,4 @@
+// Command without semicolon, inside scope - Should fail
+{
+    int a
+}

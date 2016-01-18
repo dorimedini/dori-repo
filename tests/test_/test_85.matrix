@@ -1,0 +1,45 @@
+{
+    int a;
+    int b=1;
+
+    a = 5+b;
+    print a;
+
+    b = 5-a;
+    print b;
+
+    matrix m1(2,2) = [1,2;3,4];
+    matrix m2(2,2) = [2,3;4,5];
+    matrix m3(2,2) = m1 - m2;
+    print m3;
+
+    b = 2*2;
+    print b;
+    b = a*a;
+    print b;
+    b = 2*a;
+    print b;
+    b = a*2;
+    print b;
+
+    m3 = m1*4;
+    print m3;
+
+    m3 = 4*m1;
+    print m3;
+
+    a=5;
+    b = 5/a;
+    print b;
+
+    b = a/5;
+    print b;
+
+    b = -a;
+    print b;
+
+    m3 = -m3;
+    print m3;
+
+}
+    

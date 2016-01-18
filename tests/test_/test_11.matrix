@@ -1,0 +1,4 @@
+// Test initializations
+{
+    int a = [0];
+}

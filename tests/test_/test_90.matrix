@@ -1,0 +1,27 @@
+{
+    int a = 0;
+    foreach (b in [1,2;3,4;5,6]){
+        print b;
+        a = a+b;
+    }
+    print a;
+
+    int i;
+    int n1 = 0,n2 = 1, temp;
+    while (i < 10){
+        temp = n1+n2;
+        n1 = n2;
+        n2 = temp;
+        print n2;
+        i = i+1;
+    }
+
+    i = 0;
+    while (i < 5){
+        foreach (i in [1,10;2,20;3,30]){
+            a = i*i;
+            print a;
+        }
+        i = i+1;
+    }
+}

@@ -1,0 +1,4 @@
+{
+    int a;
+    matrix m(a,a) = [1,1];
+}

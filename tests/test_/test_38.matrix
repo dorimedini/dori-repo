@@ -1,0 +1,6 @@
+{
+    int a = 0;
+    if (a in [0,1,2,3]) print "yes"; else print "no";
+    if (a-1 in [0,1,2,3]) print "yes"; else print "no";
+}
+

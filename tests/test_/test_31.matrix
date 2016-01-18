@@ -1,0 +1,26 @@
+{
+    int a=5;
+    matrix m(2,2);
+
+    m[0,1] = 6;
+
+    if ( 5 > 4 )  print "Yes"; else print "No";
+    if ( 6 >= a)  print "Yes"; else print "No"; 
+    if ( 5 >= a)  print "Yes"; else print "No"; 
+    if ( 6 <= a)  print "Yes"; else print "No"; 
+    if ( a-1 <= a)  print "Yes"; else print "No"; 
+    if ( a+1 >= a)  print "Yes"; else print "No"; 
+    if ( a >= a)  print "Yes"; else print "No"; 
+    if ( 1 > 2 )  print "Yes"; else print "No"; 
+    if ( 2 > 1 )  print "Yes"; else print "No"; 
+    if ( 3 < 4 )  print "Yes"; else print "No"; 
+    if ( 4 < 3 )  print "Yes"; else print "No"; 
+    if ( m[0,1] == 6 )  print "Yes"; else print "No"; 
+    if ( m[0,1] == 5 )  print "Yes"; else print "No"; 
+    if ( a != 0 )  print "Yes"; else print "No"; 
+    if ( 0 != 0 )  print "Yes"; else print "No"; 
+    if (true)  print "Yes"; else print "No"; 
+    if (false)  print "Yes"; else print "No"; 
+
+    
+}

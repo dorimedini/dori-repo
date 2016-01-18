@@ -1,0 +1,2 @@
+// Should succeed because this is only 1 command
+int a = 5, b = 6;

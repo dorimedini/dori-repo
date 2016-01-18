@@ -1,0 +1,46 @@
+// Test initializations
+{
+    int a;
+    print a;
+
+    int b = 5;
+    print b;
+
+    int c = -6;
+    print c;
+
+    int multiple = 10, vars = 11, on = 12, same = 13, line = 14;
+    print multiple;
+    print vars;
+    print on;
+    print same;
+    print line;
+
+    int variable_name_with_all_allowed_characters_12345 = 20;
+    print variable_name_with_all_allowed_characters_12345;
+
+    matrix m1(2, 3);
+    print m1;
+
+    matrix m2(1, 1) = [1];
+    print m2;
+
+    matrix m3(1, 1) = [c];
+    print m3;
+
+    matrix m4(2, 2) = [1, 2; 4, 5];
+    print m4;
+
+    matrix m5(2, 3) = [1+5, 2-4, 3*3; 4/3, 5*(3-1), 6];
+    print m5;
+
+    matrix m6(3, 2) = [a, b; c, a; b, c];
+    print m6;
+
+    matrix m7(2, 2) = [a, b; c, a] + [10, 11, 12; 13, 14, 15] * transpose([20, 21, 22; 23, 24, 25]);
+    print m7;
+
+    matrix mult(1, 2) = [10, 11], matrices(2, 1) = [12; 13];
+    print mult;
+    print matrices;
+}

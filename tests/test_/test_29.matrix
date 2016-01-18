@@ -1,0 +1,5 @@
+// Test initializations
+{
+    // Will fail because second parameter does not contain size in definition
+    matrix first(1, 2) = [10, 11], second_bad = [12, 13];
+}

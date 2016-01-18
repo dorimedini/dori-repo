@@ -1,0 +1,4 @@
+{
+    int a =0;
+    if (0 in a) print "Hi";
+}

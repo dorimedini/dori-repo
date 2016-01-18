@@ -1,0 +1,15 @@
+{
+    int a=5;
+    matrix m(2,2);
+
+    m[0,1] = 6;
+
+    if ( 6 in m )  print "Yes"; else print "No";
+    if ( 2 in m )  print "Yes"; else print "No";
+    if ( 2 in [0,1,2] )  print "Yes"; else print "No";
+    if ( 1 in [0,1,2] )  print "Yes"; else print "No";
+    if ( 0 in [0,1,2] )  print "Yes"; else print "No";
+    if ( -5-5 in [0,1,2] )  print "Yes"; else print "No";
+    if ( -5+5 in [0,1,2] )  print "Yes"; else print "No";
+
+}

@@ -1,0 +1,6 @@
+// Should succeed because this is only 1 command
+if (4 != 5) {
+    int a = 3;
+    print a;
+}
+

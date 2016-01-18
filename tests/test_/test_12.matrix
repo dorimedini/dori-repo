@@ -1,0 +1,5 @@
+// Test initializations
+{
+    int a = 3;
+    matrix m(2, a);
+}

@@ -1,0 +1,18 @@
+// Test assignments
+{
+    matrix a(2, 2) = [1, 2; 3, 4];
+    matrix b(2, 2) = a;
+    matrix c(2, 2);
+    print c;
+
+    c = b;
+
+    print a;
+    print c;
+
+    if (a[1, 1] == c[1, 1]) {
+        print "GOOD!";
+    } else {
+        print "BAD!";
+    }
+}
