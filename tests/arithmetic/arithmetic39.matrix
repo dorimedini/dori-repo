@@ -1,0 +1,11 @@
+{
+	int g = 1-------2;
+	print g;
+	
+	int y = 6-5-4*5+2/2;
+	print y;
+	
+	int a = 60/10-2;
+	print a;
+}
+

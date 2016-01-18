@@ -1,0 +1,14 @@
+{
+	matrix m(2,2)=[1,1;2,2];
+	int i=0;
+	matrix b(1,4);
+	foreach (x in m)
+	{
+		b[0,1] = i + x;
+		x = i;
+		print x;
+		i = i + 1;
+	}
+	print m;
+	print b;
+}

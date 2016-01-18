@@ -1,0 +1,9 @@
+{
+	int g = 2;
+	while (g<20)
+	{
+		print g;
+		g = g * 2 + 1;
+	}
+	print g;
+}

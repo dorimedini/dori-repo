@@ -1,0 +1,21 @@
+{
+	int x=1,y;
+	{ 
+		print x;
+		int x=3;
+		
+		if (true) 
+			int x=2;
+		print x;
+		
+		if (true) 
+		{
+			int x=22;
+			print x;
+			print y;
+		}
+		print x;
+	}
+	print x;
+	print y;
+}

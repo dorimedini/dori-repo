@@ -1,0 +1,12 @@
+{
+	int x;
+	while ((x<10 || false) && x<-11)
+	{
+		print x;
+		{
+			x = 1 + x;
+		}	
+	}
+	print x;
+}
+

@@ -1,0 +1,4 @@
+{
+if (true) print "good";
+if (false) print "bad";
+}

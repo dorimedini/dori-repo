@@ -1,0 +1,14 @@
+{
+	int f = 3;
+	while (f<=24)
+	{
+		f = f*2;
+		print f;
+	}
+	while (f>=45)
+	{
+		f = f-1;
+		print f;
+	}
+}
+

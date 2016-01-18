@@ -1,0 +1,31 @@
+{
+	int d = 3;
+	
+	if (22>3)
+	{
+		print d;
+		int d = 2;
+		print d;
+	}
+	else
+	{
+		print d;
+		matrix d(2,2);
+		print d;
+	}
+	print d;
+
+	if (22<3)
+	{
+		print d;
+		int d = 2;
+		print d;
+	}
+	else
+	{
+		print d;
+		matrix d(2,2);
+		print d;
+	}
+	print d;
+}

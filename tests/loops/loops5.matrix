@@ -1,0 +1,18 @@
+{
+	int f = 10;
+	int g = 20;
+	matrix m(1,1) = [4];
+	int i;
+	while (f > 0 || true && g > f)
+	{
+		print "iteration:";
+		print i;
+		{
+			f = f - 3;
+		}	
+		g = g - 5;
+		i = i + 1 * -1 * -1;
+	}
+	print f;
+}
+

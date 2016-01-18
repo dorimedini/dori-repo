@@ -1,0 +1,12 @@
+{
+	int x,y=1,z;
+	{ 
+		int x=3,y=2,z=1;
+		print x;
+		print y;
+		print z;
+	}
+	print x;
+	print y;
+	print z;
+}

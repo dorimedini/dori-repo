@@ -1,0 +1,18 @@
+{
+	matrix x(3,2);
+	while (false) int x=3;
+	print x;
+	int y=8;
+	{
+		int z=4;
+		print z;
+	}
+	{
+		print z;
+		print x;
+		int x=8+y;
+		print y;
+	}
+	x[1,1]=9;
+	print x;
+}

@@ -24,6 +24,7 @@ test_types=(
 	"stack_reuse"
 	"conditionals"
 	"loops"
+	"io"
 	"test_"
 )
 
