@@ -83,7 +83,11 @@ function run_test {
 # If asked by the user, run only a specific test:
 if [ -n "$1" ]; then
 	echo "*************************************************************************************"
-	do_test $1 "$1$2"
+	if [ -n "$2" ]; then
+		do_test $1 "$1$2"
+	else
+		run_test $1
+	fi
 	echo "*************************************************************************************"
 # Otherwise, run custom tests
 else
