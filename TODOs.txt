@@ -13,4 +13,7 @@ V	3. Associativity for boolean operators?
 	   if an input Exp is a constant, we need to output code with the actual number.
 	   If an Exp isn't constant, then we need to use it's stack_offset field.
 	   Look at functions like mul(), add(), negate() etc, and all Exp reducing rules.
-	9. Test #19, #20 in the test_ directory. Why semantic error and not syntactic error?
+V	9. Test #19, #20 in the test_ directory. Why semantic error and not syntactic error?
+	   OK: This is because 'matrix m{1,2};' is first observed as 'matrix m', Init tries to reduce
+	   using the ID rule but throws an error because you can't reduce a matrix type using the
+	   Init : ID rule.
