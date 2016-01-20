@@ -1,0 +1,43 @@
+{
+	print "Checkpoint #1";
+	if(true){
+		if(true){
+			print "Checkpoint #2";
+			if(false){
+				print "Error";
+			}
+			else{
+				print "Checkpoint #3";
+			}
+                        if(true){
+				print "Checkpoint #4";
+	                	if(false){
+					print "Error";
+				}
+				else{
+					print "Checkpoint #5";
+				}
+                        }
+                        else{
+				print "Error";
+                        }
+		}
+              	else{
+			print "Error";
+                }
+		print "Checkpoint #6";
+		if(false){
+			print "Error";
+                }
+                else{
+			print "Checkpoint #7";
+                }
+                if(false){
+                        print "Error";
+                }
+                else{
+                        print "Checkpoint #8";
+                }
+	}
+	print "Checkpoint #9";
+}
