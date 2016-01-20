@@ -1,0 +1,29 @@
+{
+	if(true){
+		int x;
+	}
+        if(true){        
+                int x;
+        }
+        if(true){        
+                int x;
+        }
+        if(true){        
+                int x;
+        }
+        if(true){        
+                int x;
+        }
+        if(true){        
+                int x;
+		if(true){        
+                	int x;
+			int y;
+			if(true){        
+                		int x;
+				int z;
+        		}
+        	}
+        }
+	print "Should check memory allocation...";
+}

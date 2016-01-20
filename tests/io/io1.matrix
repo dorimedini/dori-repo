@@ -1,0 +1,6 @@
+{
+	matrix m(2,2);
+	read m;
+	foreach (x in m)
+		print x;
+}

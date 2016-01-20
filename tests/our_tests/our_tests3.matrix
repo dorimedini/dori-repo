@@ -1,0 +1,23 @@
+{
+	matrix m(1,1) = [1];
+	{
+		if (m[0,0] == 1) {
+			matrix m(2,2) = [1,2;3,4];
+			print m;
+		}
+		foreach (x in m) {
+		 	x = x+1;
+		 	print "is it 2?";
+			print x;
+			print "is it [1]?";
+			print m;
+			m[0,0] = 0;
+			print "is it 2?";
+			print x;
+			print "is it [0]?";
+			print m;
+		}
+		print "is it [0]?";
+		print m;
+	}
+}

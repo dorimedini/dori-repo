@@ -1,0 +1,28 @@
+printLn "Checkpoint #1"
+goto 2
+goto 3
+printLn "Checkpoint #2"
+goto 7
+printLn "Error"
+goto 8
+printLn "Checkpoint #3"
+goto 9
+printLn "Checkpoint #4"
+goto 13
+printLn "Error"
+goto 14
+printLn "Checkpoint #5"
+goto 16
+printLn "Error"
+goto 18
+printLn "Error"
+printLn "Checkpoint #6"
+goto 22
+printLn "Error"
+goto 23
+printLn "Checkpoint #7"
+goto 26
+printLn "Error"
+goto 27
+printLn "Checkpoint #8"
+printLn "Checkpoint #9"

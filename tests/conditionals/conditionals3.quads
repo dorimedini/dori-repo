@@ -1,0 +1,58 @@
+s[0]=0
+s[1]=s[0]-1
+if 0>s[1] goto 4
+goto 6
+printLn "true 1"
+goto 7
+printLn "false 1"
+goto 10
+goto 12
+goto 10
+printLn "true 2"
+goto 13
+printLn "false 2"
+s[2]=0
+s[3]=10
+s[4]=10
+s[5]=s[4]
+if s[2]<10 goto 19
+goto 21
+if 0<10 goto 23
+goto 21
+printLn "false 3"
+goto 24
+printLn "true 3"
+s[6]=0
+s[7]=s[6]-1
+s[8]=0
+s[9]=s[8]-s[7]
+if s[9]==1 goto 30
+goto 31
+printLn "true 4"
+s[10]=0
+s[11]=s[10]-1
+s[12]=0
+s[13]=s[12]-s[11]
+if s[13]!=1 goto 37
+goto 38
+printLn "false 4"
+if 1==1 goto 40
+goto 49
+if s[5]==s[2] goto 49
+goto 42
+if s[5]==s[3] goto 44
+goto 49
+if s[5]>0 goto 46
+goto 49
+s[14]=s[5]*s[2]
+if s[14]>0 goto 49
+goto 55
+s[15]=s[2]*s[3]
+if s[15]==s[3] goto 55
+goto 52
+if 3>5 goto 55
+goto 54
+goto 57
+printLn "absolutly true"
+goto 58
+printLn "absolutly false"

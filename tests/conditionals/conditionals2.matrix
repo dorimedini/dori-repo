@@ -1,0 +1,31 @@
+//Check Matrix In Operation
+{
+	int x;
+	matrix m(2,2);
+	if(0 in m){
+		print "Im happy";
+	}
+	m[0,0]=1;
+        if(x+x*x+0 in m){
+        	print "Still happy..";
+        }
+	m[0,1]=1;
+	m[1,0]=1;
+	m[1,1]=-1;
+        if(0 in m){        
+                print "Sad.";
+        }
+	if(-m[0,0] in m){
+                print "Still happy...";
+        }
+
+	matrix m1(1,1) = [1],m2(1,2) = [1,2];
+        if(m[0,0] in m1 && (m[0,0] in m2)){  
+                print "Still happy...."; 
+        }
+	
+	if(1 in m1){
+		if(!5 in m1)
+			print "Super Happy!";
+	}
+}

@@ -1,0 +1,41 @@
+//Test complex boolean expressions
+{
+	if(3*3-9+0>-1){
+		print "true 1";
+	}
+	else{
+		print "false 1";
+	}
+
+	if(true || false && true){
+                print "true 2"; 
+        }
+        else{  
+                print "false 2";
+        }
+
+	int x,y=10;
+        matrix m(1,1)=[10];
+
+	if(x >= 10 || 0 >= 10){
+                print "false 3";
+        }
+        else{
+                print "true 3";
+        }
+
+	if(--1 == 1){
+		print "true 4";
+	}
+
+        if(--1 != 1){
+                print "false 4";
+        }
+
+	if(1==1 && ! x in m && y in m && m[0,0]>0 && m[0,0]*x<=0 || x*y==y || 3>5 || !!!true){
+		print "absolutly true";
+	}
+	else{
+                print "absolutly false";
+	}
+}

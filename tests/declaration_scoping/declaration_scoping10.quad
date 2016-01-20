@@ -1,0 +1,25 @@
+s[0]=1
+printLn "Should be integer 1"
+printLn s[0]
+s[1]=0
+printLn "Should be integer 0"
+printLn s[1]
+s[2]=2
+s[3]=s[2]
+printLn "Should be matrix [2]"
+print "["
+print s[3]
+printLn "]"
+s[4]=3
+printLn "Should be integer 3"
+printLn s[4]
+printLn "Should be matrix [2]"
+print "["
+print s[3]
+printLn "]"
+printLn "Should be integer 0"
+printLn s[1]
+printLn "Should be integer 0"
+printLn s[1]
+printLn "Should be integer 1"
+printLn s[0]

@@ -1,0 +1,9 @@
+{
+	int x=0,y=0;
+	read x;
+	print x;
+	print y;
+	read y;
+	print x;
+	print y;
+}

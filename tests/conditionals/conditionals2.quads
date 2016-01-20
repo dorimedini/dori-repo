@@ -1,0 +1,57 @@
+s[0]=0
+s[1]=0
+s[2]=0
+s[3]=0
+s[4]=0
+if s[1]==0 goto 10
+if s[2]==0 goto 10
+if s[3]==0 goto 10
+if s[4]==0 goto 10
+goto 11
+printLn "Im happy"
+s[1]=1
+s[5]=s[0]*s[0]
+s[6]=s[0]+s[5]
+s[7]=s[6]+0
+if s[1]==s[7] goto 20
+if s[2]==s[7] goto 20
+if s[3]==s[7] goto 20
+if s[4]==s[7] goto 20
+goto 21
+printLn "Still happy.."
+s[2]=1
+s[3]=1
+s[8]=0
+s[9]=s[8]-1
+s[4]=s[9]
+if s[1]==0 goto 31
+if s[2]==0 goto 31
+if s[3]==0 goto 31
+if s[4]==0 goto 31
+goto 32
+printLn "Sad."
+s[10]=0
+s[11]=s[10]-s[1]
+if s[1]==s[11] goto 39
+if s[2]==s[11] goto 39
+if s[3]==s[11] goto 39
+if s[4]==s[11] goto 39
+goto 40
+printLn "Still happy..."
+s[12]=1
+s[13]=s[12]
+s[14]=1
+s[15]=2
+s[16]=s[14]
+s[17]=s[15]
+if s[13]==s[1] goto 48
+goto 52
+if s[16]==s[1] goto 51
+if s[17]==s[1] goto 51
+goto 52
+printLn "Still happy...."
+if s[13]==1 goto 54
+goto 57
+if s[13]==5 goto 57
+goto 56
+printLn "Super Happy!"

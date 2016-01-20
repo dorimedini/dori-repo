@@ -1,0 +1,19 @@
+goto 1
+s[0]=0
+goto 3
+s[0]=0
+goto 5
+s[0]=0
+goto 7
+s[0]=0
+goto 9
+s[0]=0
+goto 11
+s[0]=0
+goto 13
+s[1]=0
+s[2]=0
+goto 16
+s[3]=0
+s[4]=0
+printLn "Should check memory allocation..."
