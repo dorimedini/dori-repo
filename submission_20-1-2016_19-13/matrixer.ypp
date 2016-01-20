@@ -1,0 +1,1401 @@
+%{
+	#include <iostream>
+	#include <sstream>
+	#include <list>
+	#include <set>
+	#include <vector>
+	#include <string>
+	#include <map>
+	#include "attributes.h"
+	#include "bp.hpp"
+	using std::string;
+	using std::cout;
+	using std::endl;
+	using std::list;
+	using std::set;
+	using std::vector;
+	using std::map;
+	using std::ostringstream;
+	/** TODO: Before submitting, set DEBUG to 0 (from attributes.h) */
+	#if DEBUG
+		#define YYERROR_VERBOSE 1
+	#endif
+	
+	extern int yylex();
+	int yyerror(char const*);
+	
+	/*******************************
+				GLOBALS
+	*******************************/
+	
+	// Map of symbols, linked to their data.
+	// Listed by scope.
+	list< map<string,YYSTYPE> > symbol_table;
+		
+	/*******************************
+			ERROR HANDLERS
+	*******************************/
+	
+	// General use error handler for semantic errors
+	void semantic_error();
+	
+	/*******************************
+		  SEMANTIC VALIDATORS
+	*******************************/
+	
+	// Make sure the two operands can perform the operation.
+	void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, char op);
+	
+	// Asserts both matrices are of the same dimensions
+	void assert_matrices_of_same_dimensions(const YYSTYPE& stype_left, const YYSTYPE& stype_right);
+	
+	// Make sure the name is available:
+	void assert_available_name(const string str);
+	
+	// Make sure the variable name is declared already.
+	// If it is, returns a pointer to the STYPE in the symbol table (for reading / editing)
+	YYSTYPE assert_declared_and_fetch(const string str);
+	
+	// Make sure the value is positive
+	void assert_positive(int value);
+	
+	
+	// Make sure the given argument is a positive constant (for matrix
+	// definitions).
+	void assert_matrix_arg(const YYSTYPE& stype);
+	
+	// Same as above, only it must be non-negative.
+	// On error, outputs PositiveNumberExpected
+	void assert_matrix_dereference_arg(const YYSTYPE& stype);
+	
+	// Use this in the construction of matrices using the [1,2;3,4] notation.
+	// Input: two numbers, representing column sizes. Make sure they have the
+	// same amount of columns.
+	void assert_column_match(int col1, int col2);
+	
+	// Make sure the rows/columns are withing the bounds of the matrix
+	void assert_in_bounds(const YYSTYPE& matrix, int rows, int cols);
+	
+	// Make sure that the expression is not a matrix.
+	void assert_scalar(const YYSTYPE& stype);
+
+	void assert_matrix(const YYSTYPE& stype);
+
+	// Make sure we can multiply the two operands.
+	// This test is also used to test for matrix iteration.
+	void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2);
+
+	void assert_non_zero(int num);
+	
+	void assert_matching_declaration_type(bool is_matrix_declaration_syntax);
+	
+	/*******************************
+			UTILITY FUNCTIONS
+	*******************************/
+	
+	// Instead of writing:
+	// ostringstream os;
+	// os << long << "and" << boring << string(stream);
+	// emit(os.str());
+	// Just use the macro!
+	#define EMIT_OS(stream) do { \
+			ostringstream os; \
+			os << stream; \
+			emit(os.str()); \
+		} while(0)
+	
+	void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const);
+
+	void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols, 
+		const vector< vector<int> >& matrix);
+	
+	// Negate the value of the input, whether it's a scalar or matrix.
+	// The values of is_int_const and is_matrix are copied.
+	YYSTYPE negate_value(const YYSTYPE& stype);
+	
+	// Add the two values (matrix or not).
+	// Assume addition is allowed! Error handling should be done in the semantic analysis!
+	// The value of is_matrix is copied, and the value of is_int_const is calculated.
+	YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+	// Multiply the two variables.
+	// This should work for any combination of operand types.
+	// Calculates is_matrix and is_int_const, and the rows/columns if is_matrix=true.
+	// ASSUMES MULTIPLICATION IS LEGAL!
+	YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2);
+	
+	// Transposes a matrix (allocates memory for the transposed matrix)
+	YYSTYPE transpose(const YYSTYPE& op);
+	
+	// Takes care of scope cleanup.
+	// Pops one element of the symbol table and frees up it's memory
+	void exit_scope();
+	
+	// After validating arguments, basically does:
+	// target_stype=matrix_name[row_stype.value][col_stype.value];
+	// Also updates the stack_offset field to reflect the cell's location in the stack.
+	void handle_matrix_dereference(
+		YYSTYPE& target_stype,
+		string matrix_name,
+		const YYSTYPE& row_stype,
+		const YYSTYPE& col_stype);
+	
+	// Returns a string "s[i]" where i is the input value
+	string s(int i);
+	
+	// Declares a new variable, including:
+	// - Some asserts() (NOT all of them)
+	// - Updating the symbol table, including offsets
+	// - Outputs IR
+	// Assumes it's OK to declare a variable of the given type, but note that it's overloaded for
+	// declaring matrices.
+	YYSTYPE declare(string name, int value_or_offset, bool is_const);
+	YYSTYPE declare(string name, int rows, int cols);
+	YYSTYPE declare(string name, int rows, int cols, const YYSTYPE& source, bool is_symbol);
+	
+	// Searches the symbol table for the variable and returns the stack offset.
+	int get_stack_offset(const string& name);
+	
+	// Adds a temporary variable into the symbol table, so we can pop it later automatically
+	// using exit_scope()
+	// If requested, this function will also advance the stack pointer by the amount needed to store
+	// the temporary variable in memory.
+	// IMPORTANT: For this to work, the STYPE parameter must have valid is_matrix, rows and cols
+	// fields. If allocation isn't requested, the stack_offset field must also be valid.
+	void put_temp_in_symbol_table(YYSTYPE& stype, bool allocate);
+
+    void emit_if_statement(string val1, string relop, string val2, int goto_address);
+
+    // The goto address will not be emitted.
+    void emit_if_statement(string val1, string relop, string val2);
+
+    // Helper function called by the 2 previous functions.
+    void _emit_if_statement(string val1, string relop, string val2, string goto_offset);
+
+	// These are for use in the Mat rules, specifically designed for use with MatFirstITer and
+	// MatSecondIter.
+	// Assumes target.stack_offset is defined and memory has been allocated for the target,
+	// and assumes the other YYSTYPEs also have valid stack_offset fields.
+	void emit_matrix_construction(YYSTYPE& target, YYSTYPE& first_cell, YYSTYPE& first_row);
+	void emit_matrix_construction(YYSTYPE& target, YYSTYPE& first_cell, YYSTYPE& first_row,
+														YYSTYPE& rest_of_matrix);
+	
+    void emit_matrix_printing(YYSTYPE matrix);
+    
+    void emit_input(int dest_stack_offset);
+%}
+
+	/*******************************
+	********************************
+				TOKENS
+	********************************
+	*******************************/
+
+%token LP RP LC RC LB RB SC TYPE ID NUM
+%token RELOP PRINT READ STRING TRUE FALSE WHILE FOREACH
+ // Assignment is right-associative: a=b=c ==> a=(b=c)
+%right ASSIGN
+ // The comma sign needs to be associative: int a,b,c ==> int (a,b),c
+%left CS
+ // We need to make ELSE higher priority then the IF rule.
+ // Give IF a priority, and make ELSE's priority higher.
+ // Then use %prec to set the IF rule's priority to the IF token's priority.
+%nonassoc IF
+%nonassoc ELSE
+ // Boolean operators should have priority less than any arithmetic operators,
+ // because (for example) "3<2+2" should be TRUE.
+ // These should be associative, and make AND higher priority to correctly
+ // evaluate (a OR b AND c)==(a OR (b AND c)) 
+%left OR
+%left AND
+ // Make NOT stronger than both of the above:
+%nonassoc NOT
+ // The IN token needs lower priority than arithmetic operators, so we can do
+ // something like "2 IN [1]+[1]" (should evaluate to TRUE).
+%nonassoc IN
+ // It should be a good idea to make UNARY_MINUS the highest priority.
+ // Assuming it's really a UNARY minus and not a regular one, the value
+ // should be negated before other operations:
+ // 3*-2=-6
+ // Maybe this doesn't matter, but make it a high priority anyway - under
+ // the assumption that the lexical analyzer correctly identifies true
+ // unary minuses.
+ // Note that if M is a matrix, then -M is not legal! No need to prioritize
+ // between the unary minus and the iteration (^) sign
+%left MINUS PLUS
+%left MUL DIV
+%nonassoc UNARY_MINUS
+%token TRANSPOSE
+
+
+%%
+
+	/*******************************
+	********************************
+				RULES
+	********************************
+	*******************************/
+
+ // To simulate BNF iteration, use XIter variables for every X with iterations.
+
+S				:	EnterScope Stmt {
+                        bp($2.next_list, next());
+	                    exit_scope();
+                    }
+				;
+ 
+Stmt			:	TYPE Init InitIter SC {
+                        $$.next_list = list<int>();
+					}
+				|	Lvalue ASSIGN Exp SC {
+						assert_type_match($1, $3, '=');
+                        
+                        int dest_stack_offset = $1.stack_offset;
+                        int src_stack_offset = $3.stack_offset;
+                        
+                        if ($1.is_matrix) {
+							assert_matrices_of_same_dimensions($1, $3);
+                        
+                            for (int i = 0; i < $1.rows * $1.cols; ++i) {
+                                emit(s(dest_stack_offset++) + "=" + s(src_stack_offset++));
+                            }
+						}
+                        else {
+                            emit(s(dest_stack_offset) + "=" + s(src_stack_offset));
+                        }
+                        
+                        $$.next_list = list<int>();
+                    }
+				|	PRINT OutputSpecifier SC {
+						if ($2.is_string)
+						{
+							emit("printLn " + $2.name);
+						}
+						else
+						{
+							if (!$2.is_matrix) {
+								emit("printLn " + s($2.stack_offset));
+							}
+							else {
+                                emit_matrix_printing($2);
+							}
+						}
+                    
+                        $$.next_list = list<int>();
+                    }
+				|	READ ID SC {
+						$$ = assert_declared_and_fetch($2.name);
+						if (!$$.is_matrix) {
+                            emit_input($$.stack_offset);
+						}
+						else {
+							for (int row = 0; row < $$.rows; ++row)
+							{
+								for (int col = 0; col < $$.cols; ++col)
+								{
+									emit_input($$.stack_offset + row * $$.cols + col);
+                            	}
+							}
+						}
+					
+                        $$.next_list = list<int>();
+                    }
+				|	IF LP Bool RP EnterScope SaveAddress Stmt %prec IF {
+                        bp($3.true_list, $6.buffer_offset);
+                        $$.next_list = merge($3.false_list, $7.next_list);
+
+                        exit_scope();
+					}
+				|	IF LP Bool RP EnterScope SaveAddress Stmt ELSE PutGoto ExitScope EnterScope SaveAddress Stmt {
+                        bp($3.true_list, $6.buffer_offset);
+                        bp($3.false_list, $12.buffer_offset);
+                        $$.next_list = merge($7.next_list, $13.next_list);
+                        $$.next_list = merge($$.next_list, $9.next_list);
+
+                        exit_scope();
+					}
+				|	WHILE SaveAddress LP Bool RP EnterScope SaveAddress Stmt {
+                        bp($4.true_list, $7.buffer_offset);
+                        
+                        bp($8.next_list, $2.buffer_offset);
+
+                        EMIT_OS("goto " << $2.buffer_offset);
+
+                        $$.next_list = $4.false_list;
+
+                        exit_scope();
+					}
+				|	ForeachDeclareId IN Exp RP ForeachDeclareLoopCounter PutGoto SaveAddress Stmt {
+                        YYSTYPE matrix = $3;
+                        int matrix_size = matrix.rows * matrix.cols;
+
+                        // *** Semantic checks: ***
+                        // Get next address, fill in the PutGoto variable
+						// so the first thing that happens (before Stmt's code)
+						// is the loop initialization code.
+						// Exit scope at the end
+						assert_matrix($3);
+
+                        // *** Backpatching: ***
+                        bp($8.next_list, next()); // Backpatching Stmt's next_list
+                        bp($6.next_list, next() + matrix_size); // Backpatching PutGoto's next_list 
+
+                        // *** Emitting code: ***
+
+                        // Naming all relevant variables for not getting confused later
+                        string iterating_element = s($1.stack_offset);
+                        string loop_counter = s($5.stack_offset);
+                        int stmt_buffer_offset = $7.buffer_offset;
+                                                
+                        // matrix_size is the amount of if statements, which we would like to jump over
+                        int goto_offset = next() + matrix_size;
+
+                        for (int i = 1; i < matrix_size; ++i)
+                        {
+                            /* We would like to jump over the code block of the previous iteration
+                             * (The first iteration, where the loop counter == 0,
+                             * is redirected by the PutGoto's goto.
+                             * The following ifs redirect to iteration 1 to matrix_size-1.)
+                             */
+                            goto_offset += 3;
+
+                            ostringstream i_os; 
+                            i_os << i;
+                            string i_str = i_os.str();
+
+                            emit_if_statement(loop_counter, "==", i_str, goto_offset);
+                            // We've added an if statement, so the next goto has one less statement to jump over.
+							
+							// No, we'll always have this:
+							// if <> goto A
+							// if <> goto B
+							// ...
+							// if <> goto Z
+							// goto END
+							// s[ID]=s[MatrixCellA]
+							// s[Counter]=s[Counter]+1
+							// goto UP
+							// s[ID]=s[MatrixCellB]
+							// s[Counter]=s[Counter]+1
+							// goto UP
+							// ...
+							// s[ID]=s[MatrixCellZ]
+							// s[Counter]=s[Counter]+1
+							// goto UP
+							// Anyway, always jump exactly 3 statements.
+							
+							// goto_offset -= 1;
+                        }
+                        
+                        $$.next_list = makelist(next());
+                        emit("goto ");
+                        
+                        for (int i = 0; i < matrix_size; ++i)
+                        {
+                            emit(iterating_element + "=" + s(matrix.stack_offset + i));
+                            emit(loop_counter + "=" + loop_counter + "+1");
+                            EMIT_OS("goto " << stmt_buffer_offset);
+                        }
+
+                        // *** Exiting scope: ***
+                        exit_scope();
+					}
+				|	LC EnterScope IterStmts RC {
+                        $$.next_list = $3.next_list;
+
+                        exit_scope();
+					}
+				;
+
+ForeachDeclareId 	:	FOREACH EnterScope LP ID {
+                        // Declare ID, including setting ForeachDeclareId.stack_offset to ID's stack_offset
+                        // Not using declare function since there is no need to emit an initialization of ID.
+                        
+                        set_stype_to_int($$, $4.name, 0, false);
+                        $$.stack_offset = newTemp();
+                        
+                        // Update the symbol table 
+                        symbol_table.back()[$4.name] = $$;
+                    }
+				;
+
+ForeachDeclareLoopCounter: {
+                        // Insert the loop's temp counter variable to the stack and the symbol table,
+                        // and emit setting it to 0
+
+                        set_stype_to_int($$, "", 0, false);
+
+                        // Also sets ForeachDeclareLoopCounter.stack_offset to the loop counter's stack offset
+                        put_temp_in_symbol_table($$, true);
+
+                        // Output code
+                        EMIT_OS(s($$.stack_offset) << "=" << 0);
+                    }
+                ;
+
+SaveAddress		:	{
+						$$.buffer_offset = next();
+					}
+				;
+
+PutGoto			:	{
+						$$.next_list = makelist(next());
+						emit("goto ");
+					}
+				;
+
+EnterScope		:	{
+						// Add a new scope
+						symbol_table.push_back(map<string,YYSTYPE>());
+					}
+				;
+ExitScope       :	{
+                        exit_scope();
+                    }
+                ;
+IterStmts		:	Stmt SaveAddress IterStmts {
+                        bp($1.next_list, $2.buffer_offset);
+                        $$.next_list = $3.next_list;
+					}
+				|	Stmt {
+                        $$.next_list = $1.next_list;
+					}
+				;
+
+Init			:	ID {
+						// Set the value to zero and the type to number (if we were
+						// declaring a matrix, the production rule would be the one
+						// with the brackets: x[a,b]).
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table'), and if not - add it.
+						assert_matching_declaration_type(false);
+						$$ = declare($1.name, 0, true);
+					}
+				|	ID ASSIGN Exp {
+						// Set type to integer, make sure Exp's type is the same.
+						// No need to make sure Exp.name has been declared or is constant,
+						// this is taken care of in the derivation of Exp.
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table').
+						// Add the name to the symbol table.
+						assert_matching_declaration_type(false);
+						assert_scalar($3);
+						$$ = declare($1.name, $3.stack_offset, false);
+					}
+				|	ID LP Exp CS Exp RP {
+						// Make sure the expressions are positive (not non-
+						// negative, that's not enough... no such thing as a 0x0
+						// matrix).
+						// Make sure both Exp(s) are constant!
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table'), and if not - add it.
+						assert_matching_declaration_type(true);
+						assert_matrix_arg($3);
+						assert_matrix_arg($5);
+						$$ = declare($1.name, $3.value, $5.value);
+					}
+				|	ID LP Exp CS Exp RP ASSIGN Exp {
+						// Several things need to be enforced here:
+						// 1. Make sure the first two Exps are non-negative constants
+						// 2. Make sure the third Exp is a matrix, with the same
+						//    number of rows/columns as ID
+						// After that, assign.
+						// Make sure all three Exp.name(s) have been declared,
+						// and make sure the first two Exp(s) are constant!
+						// Make sure the name is available (not already in the set of
+						// names mapped in 'symbol_table'), and if not - add it.
+						assert_matching_declaration_type(true);
+						assert_matrix_arg($3);
+						assert_matrix_arg($5);
+						$$ = declare($1.name, $3.value, $5.value, $8, true);
+					}
+				;
+
+InitIter		:	CS Init InitIter {
+						
+					}
+				|	{
+						
+					}
+				;
+
+Exp				:	Exp PLUS Exp {
+						// Enforce same types of expressions, calculate the value.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						// The result is a matrix if and only if the left operand is
+						// a matrix (there is a mismatch error if the two operands
+						// are of different types).
+						// Make sure the matrices are of the same dimensions (if
+						// we're summing matrices).
+						assert_type_match($1,$3,'+');
+						if ($1.is_matrix)
+							assert_matrices_of_same_dimensions($1,$3);
+						$$ = add($1,$3);
+					}
+				|	Exp MINUS Exp {
+						// Enforce same types of expressions, calculate the value.
+						// Make sure both Exp(s) are either constant or have
+						// been declared.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						assert_type_match($1,$3,'-');
+						if ($1.is_matrix)
+							assert_matrices_of_same_dimensions($1,$3);
+						$$ = add($1,negate_value($3));						
+					}
+				|	Exp MUL Exp {
+						// The operation done here depends on the types of the
+						// expressions (matrix*matrix, num*num or a combination).
+						// Make sure both Exp(s) are either constant or have
+						// been declared.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						assert_type_match($1,$3,'*');	// This should always be OK...
+						assert_multiplicative($1,$3);
+						$$ = mul($1,$3);
+					}
+				|	Exp DIV Exp {
+						// Make sure neither is a matrix, and calculate the value.
+						// Make sure both Exp(s) are either constant or have
+						// been declared.
+						// Set the left Exp's is_int_const field to the AND operation between the
+						// is_int_const fields of the two right-side Exps.
+						assert_type_match($1,$3,'/');
+						int result=0;	// Give some default value, in case the result isn't constant
+						if ($3.is_int_const) {
+							assert_non_zero($3.value);
+							result = $1.value / $3.value;
+						}
+						// Update internal compiler data (use 'result' as the value)
+						set_stype_to_int($$, "", result, ($1.is_int_const && $3.is_int_const));
+						put_temp_in_symbol_table($$, true);
+						
+						// Output code
+						EMIT_OS(s($$.stack_offset) << "=" << 
+								s($1.stack_offset) << "/" <<
+								s($3.stack_offset));
+					}
+				|	UNARY_MINUS Exp {
+						// Negate the value (may be a matrix!).
+						// Set the left Exp's is_int_const field to the is_int_const field of the right-side
+						// Exp.
+						$$ = negate_value($2);
+					}
+				|	Mat {
+						// Update values (rows, columns, matrix data) and update
+						// the is_int_const field (using Mat.is_int_const).
+						// If Mat is undeclared, this should be caught in the
+						// reduction to Mat.
+						$$ = $1;
+						// All relevant fields will be correctly copied (no need to create a new
+						// temporary variable in the code). No need for more memory allocation.
+					}
+				|	NUM {
+						// Update internal compiler data
+						set_stype_to_int($$, "", $1.value, true);
+						put_temp_in_symbol_table($$, true);
+						// Output code
+						EMIT_OS(s($$.stack_offset) << "=" << $1.value);
+					}
+				|	ID {
+						// All IDs have values, types etc. Copy them, and set
+						// Exp to non-constant. Make sure ID.name has been declared!
+						// Let Exp equal the value of the symbol, using the symbol table.
+						$$ = assert_declared_and_fetch($1.name);
+						// Need to create a temporary variable here, because if we do this:
+						// int x;
+						// matrix m(1,2)=[x,x];
+						// We need m to have it's own 2 slots of memory. The derivation looks like:
+						// Mat : [Exp,Exp] : [ID,ID]
+						// and Mat simply gets the stack offset of the first Exp as it's offset, so
+						// ALL Exps need their own offsets in this case.
+						
+						// No. No we don't. Shut up.
+						// When reducing a matrix [x,x], the values are copied to new temp variables
+						// anyway, no problem.
+					}
+				|	LP Exp RP {
+						// Copy the data from the Exp on the right side of the
+						// production rule to the Exp on the left.
+						// Set the left Exp's is_int_const field to the 
+						// is_int_const field of the right-side Exp.
+						$$ = $2;
+						// No need to create a new temporary variable. Use the exact same memory
+						// location in the stack for both the left Exp and the right Exp in the 
+						// parenthesis.
+					}
+				|	ID LB Exp CS Exp RB {
+						handle_matrix_dereference($$, $1.name, $3, $5);
+					}
+				;
+
+Mat				:	LB Exp MatFirstIter MatSecondIter RB {
+						// Make sure the number of columns created in MatFirstIter
+						// (which is the iteration for the first row of numbers) is
+						// consistent with the number of columns created by all rows
+						// of MatSecondIter. We don't have to check all the rows in
+						// from the MatSecondIter reduction, because the reduction
+						// to MatSecondIter can check if each new row is consistent.
+						// On the other hand, the first iteration of SecondIter
+						// doesn't check the number of rows for consistency, so at
+						// least one of the rows of the matrix reduced by SecondIter
+						// must be checked.
+						// Make sure Exp is either declared or constant.
+						// For detailed comments, see MatSecondIter.
+
+						// Data validation and internal data update:
+						assert_scalar($2);
+						if ($4.rows != 0)
+							assert_column_match($3.cols+1,$4.cols);
+						set_stype_to_matrix($$, "", $4.rows+1, $3.cols+1, vector< vector<int> >());
+						$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
+						
+						// Allocate memory for the matrix
+                        put_temp_in_symbol_table($$, true);
+						
+						// Emit
+						emit_matrix_construction($$,$2,$3,$4);
+					}
+				|	TRANSPOSE LP Mat RP {
+						// Transpose.
+						$$ = transpose($3);
+					}
+				|	TRANSPOSE LP ID RP {
+						// Check if ID is declared and a matrix, and transpose.
+						YYSTYPE stype = assert_declared_and_fetch($3.name);
+						assert_matrix(stype);
+						$$ = transpose(stype);
+					}
+				;
+
+MatFirstIter	:	CS Exp MatFirstIter {
+						// Make sure the expression is a number.
+                        // We need to somehow record the number of columns created
+						// while iterating over this variable, s.t. the SecondIter
+						// variable will know how many columns must exist in each
+						// row.
+						// See the comments for MatSecondIter to understand what's going on here.
+
+
+						// Data validation and internal data update:
+						assert_scalar($2);
+						set_stype_to_matrix($$, "", 1, $3.cols+1, vector< vector<int> >());
+                        $$.matrix.resize($$.rows,vector<int>($$.cols,0));
+						
+						// Allocate memory for the matrix
+                        put_temp_in_symbol_table($$, true);
+						
+						// Emit
+						emit_matrix_construction($$,$2,$3);
+					}
+				|	{
+						// Set rows and columns to zero (recursion base).
+						// Nothing else needs to be done here, because MatFirstIter (when reduced
+						// to epsilon) doesn't represent any memory-demanding object.
+						$$.rows = 0;
+						$$.cols = 0;
+					}
+				;
+
+MatSecondIter	:	SC Exp MatFirstIter MatSecondIter {
+						// Make sure the expression is a number.
+						// Make sure the number of columns created by MatFirstIter
+						// is equal to the number of columns in the first row of
+						// the matrix created by the MatSecondIter variable on the
+						// right of the production rule. If it was nullified (the
+						// SecondIter produced an empty matrix), no need to enforce
+						// anything - the Mat rule will take care of it.
+						// If SecondIter never expands to another row (never reduced
+						// using the current rule), the number of rows should be 1.
+						// How we do this:
+						// Assume MatFirstIter.matrix is a 1xn vector of ints, where n is the
+						// desired number of columns. Assume MatFirstIter.rows=1 and
+						// MatFirstIter.cols=n.
+						// Assume MatSecondIter.matrix is a valid axb sized matrix.
+						// Under these assumptions, simply compare n==b.
+						// Merge the matrices, update the number of rows (add 1) and number of
+						// columns (copy) and insert into $$.
+						// Note the +1, as the extra Exp should be accounted for.
+						// NOTE: If MatSecondIter.rows=0, this is the first iteration of the
+						// recursion logic so we should set the number of columns now.
+                        // TODO: Is it fine to pass a local instance of vector as the matrix argument?
+						
+						// Data validation and internal data update:
+						assert_scalar($2);
+						if ($4.rows != 0)
+							assert_column_match($3.cols+1,$4.cols);
+						set_stype_to_matrix($$, "", $4.rows+1, $3.cols+1, vector< vector<int> >());
+						$$.matrix.resize($$.rows,vector<int>($$.cols, 0));
+						
+						// Allocate memory for the matrix
+                        put_temp_in_symbol_table($$, true);
+						
+						// Emit
+						emit_matrix_construction($$,$2,$3,$4);
+					}
+				|	{
+						// Set the number of rows to zero, so the above iterations know we stopped
+						// here.
+						$$.rows = 0;
+						$$.cols = 0;
+					}
+				;
+
+Lvalue			:	ID {
+						$$ = assert_declared_and_fetch($1.name);
+					}
+				|	ID LB Exp CS Exp RB {
+						handle_matrix_dereference($$, $1.name, $3, $5);
+					}
+				;
+				
+Bool			:	Exp RELOP Exp {
+                        assert_type_match($1, $3, '<');
+
+                        string val1 = s($1.stack_offset);
+                        string val2 = s($3.stack_offset);
+                        string relop = $2.name;
+
+                        bool is_relop_missing_from_IL = (relop == "<=") or (relop == ">=");
+                        if (is_relop_missing_from_IL) {
+                            /* Reverse the operations which are not part of the IL:
+                             * # a<=b - reverse to not a>b
+                             * # a>=b - reverse to not a<b
+                             * The "not" will be accomplished by swapping true_list and false_list later.
+                             */
+                            relop = (relop == "<=") ? ">" : "<";
+                        }  
+
+                        if (is_relop_missing_from_IL) {
+                            $$.false_list = makelist(next());
+                        }
+                        else {
+                            $$.true_list = makelist(next());
+                        }
+                        emit_if_statement(val1, relop, val2);
+
+                        if (is_relop_missing_from_IL) {
+                            $$.true_list = makelist(next());
+                        }
+                        else {
+                            $$.false_list = makelist(next());
+                        }
+                        emit("goto ");
+                    }
+				|	Exp IN Exp {
+						assert_type_match($1, $3, 'i');
+
+                        $$.true_list = list<int>();
+                        string int_val = s($1.stack_offset);
+                        int matrix_size = $3.rows * $3.cols;
+                        for (int i = $3.stack_offset; i < matrix_size + $3.stack_offset; ++i)
+                        {
+                            $$.true_list.push_back(next());
+                            emit_if_statement(int_val, "==", s(i));
+                        }
+
+                        $$.false_list = makelist(next());
+                        emit("goto ");
+					}
+				|	NOT Bool {
+                        $$.false_list = $2.true_list;
+                        $$.true_list = $2.false_list;
+					}
+				|	Bool AND SaveAddress Bool {
+                        bp($1.true_list, $3.buffer_offset);
+                        $$.true_list = $4.true_list;
+                        $$.false_list = merge($1.false_list, $4.false_list);
+					}
+				|	Bool OR SaveAddress Bool {
+                        bp($1.false_list, $3.buffer_offset);
+                        $$.false_list = $4.false_list;
+                        $$.true_list = merge($1.true_list, $4.true_list);
+					}
+				|	LP Bool RP {
+                        $$.false_list = $2.false_list;
+                        $$.true_list = $2.true_list;
+					}
+				|	TRUE {
+                        $$.false_list = list<int>();
+                        $$.true_list = makelist(next());
+                        emit("goto ");
+					}
+				|	FALSE {
+                        $$.true_list = list<int>();
+                        $$.false_list = makelist(next());
+                        emit("goto ");
+					}
+				;
+				
+OutputSpecifier :	ID {
+						$$ = assert_declared_and_fetch($1.name);
+						$$.is_string = false;
+					}
+				|	STRING {
+						$$.name = $1.name;
+						$$.is_string = true;
+					}
+				;
+				
+%%
+
+/*******************************
+********************************
+		  C-FUNCTIONS
+********************************
+*******************************/
+
+int main() {
+	yyparse();
+	printBuffer();
+}
+
+int yyerror(char const* message) {
+	cout << "SYNTACTIC ERROR" << endl;
+	exit(0);
+}
+
+/*******************************
+		ERROR HANDLERS
+*******************************/
+
+void semantic_error() {
+	cout << "SEMANTIC ERROR" << endl;
+	exit(0);
+}
+	
+
+/*******************************
+	  SEMANTIC VALIDATORS
+*******************************/
+
+// Make sure the two operands can perform the operation.
+void assert_type_match(const YYSTYPE& stype_left, const YYSTYPE& stype_right, char op) {
+	bool mismatch=0;
+	switch(op) {
+		case '+':
+		case '-':
+		case '=':
+			// operations on 2 ints or 2 matrices
+			mismatch = (stype_left.is_matrix != stype_right.is_matrix);
+			break;
+		case '^':
+			mismatch = (!stype_left.is_matrix || stype_right.is_matrix);
+			break;
+		case 'i': // for IN token
+			mismatch = (stype_left.is_matrix || !stype_right.is_matrix);
+			break;
+		case '/':
+		case '<': // for all RELOP operations
+			// operations on 2 ints
+			mismatch = (stype_left.is_matrix || stype_right.is_matrix);
+			break;
+	}
+	if (mismatch) {
+		semantic_error();
+	}
+}
+
+// Asserts both matrices are of the same dimensions
+void assert_matrices_of_same_dimensions(
+	const YYSTYPE& stype_left, const YYSTYPE& stype_right) {
+	if ((!stype_left.is_matrix) || (!stype_right.is_matrix)
+		|| stype_left.rows != stype_right.rows || stype_left.cols != stype_right.cols) {
+		semantic_error();
+	}
+}
+
+// Make sure the name is available in the most recent scope:
+void assert_available_name(const string str) {
+	if (symbol_table.back().count(str)) {
+		semantic_error();
+	}
+}
+
+// Make sure the variable name is declared already,
+// in some encapsulating scope.
+// If it exists, return a pointer to it.
+YYSTYPE assert_declared_and_fetch(const string str) {
+	for (list< map<string,YYSTYPE> >::reverse_iterator i=symbol_table.rbegin();
+				i!=symbol_table.rend();
+				++i) {
+		if (i->count(str)) {
+			return ((*i)[str]);
+		}
+	}
+	semantic_error();
+}
+
+// Make sure the value is positive
+void assert_positive(int value) {
+	if (value <= 0) {
+		semantic_error();
+	}
+}
+
+
+// Make sure the given argument is a positive constant (for matrix
+// definitions).
+void assert_matrix_arg(const YYSTYPE& stype) {
+	if (stype.is_matrix || stype.value <= 0 || !stype.is_int_const) {
+		semantic_error();
+	}
+}
+
+// When dereferencing a matrix m[x,y], x (and y) must be non-negative
+// integers
+void assert_matrix_dereference_arg(const YYSTYPE& stype) {
+	if (stype.is_matrix || !stype.is_int_const) {
+		semantic_error();
+	}
+}
+	
+// Use this in the construction of matrices using the [1,2;3,4] notation.
+// Input: two numbers, representing column sizes. Make sure they have the
+// same amount of columns.
+void assert_column_match(int col1, int col2) {
+	if (col1 != col2) {
+		semantic_error();
+	}
+}
+	
+// Make sure the rows/columns are withing the bounds of the matrix.
+// Assumes the matrix has a valid name.
+void assert_in_bounds(const YYSTYPE& matrix, int row, int col) {
+	if (row >= matrix.rows || row < 0 || col >= matrix.cols || col < 0)
+		semantic_error();
+}
+	
+// Make sure that the expression is not a matrix.
+void assert_scalar(const YYSTYPE& stype) {
+	if (stype.is_matrix) {
+		semantic_error();
+	}
+}
+
+// Make sure that the expression is not a scalar.
+void assert_matrix(const YYSTYPE& stype) {
+	if (!stype.is_matrix) {
+		semantic_error();
+	}
+}
+
+// Make sure we can multiply the to operands.
+// This only fails for matrices with bad dimensions.
+void assert_multiplicative(const YYSTYPE& op1, const YYSTYPE& op2) {
+	if (op1.is_matrix && op2.is_matrix && op1.cols != op2.rows)
+		semantic_error();
+}
+
+void assert_non_zero(int num)
+{
+	if (num == 0)
+		semantic_error();
+}
+
+void assert_matching_declaration_type(bool is_matrix_declaration_syntax)
+{
+	if (g_is_last_type_declaration_matrix && !is_matrix_declaration_syntax)
+		semantic_error();
+	else if (!g_is_last_type_declaration_matrix && is_matrix_declaration_syntax)
+		semantic_error();
+}
+	
+
+/*******************************
+		UTILITY FUNCTIONS
+*******************************/
+
+void set_stype_to_int(YYSTYPE& stype, string name, int value, bool is_int_const)
+{
+	stype.is_matrix = 0;
+	stype.is_int_const = is_int_const;
+	stype.value = value;
+	stype.name = name;
+}
+
+void set_stype_to_matrix(YYSTYPE& stype, string name, int rows, int cols,
+	const vector< vector<int> >& matrix) 
+{
+	stype.is_matrix = true;
+	stype.rows = rows;
+	stype.cols = cols;
+	stype.matrix = matrix;
+	stype.name = name;
+
+    //TODO: Should we set stype.is_int_const to false?
+	//Why? is_int_const is relevant only if is_matrix==false 
+}
+
+// Negate the value of the input, whether it's a scalar or matrix.
+// The values of is_int_const and is_matrix are copied.
+YYSTYPE negate_value(const YYSTYPE& stype) {
+	YYSTYPE negated = stype;	// Copy basic data... int? const int? etc.
+	negated.stack_offset = newTemp();
+	if (stype.is_matrix) {
+		pop_stack(1);	// In the loop we use s(newTemp()) always, so bring the sp back one cell
+		for (int i=0; i<stype.rows; ++i) {	// before the loop starts
+			for (int j=0; j<stype.cols; ++j) {
+				EMIT_OS(s(newTemp()) << "=0-" << s(stype.stack_offset + i*stype.cols + j));
+			}
+		}
+	}
+	else {
+		negated.value = -stype.value; // In case this is a const int
+		EMIT_OS(s(negated.stack_offset) << "=0-" << s(stype.stack_offset));
+	}
+	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
+	// used.
+	put_temp_in_symbol_table(negated, false);
+	return negated;
+}
+
+// Add the two values (matrix or not).
+// Assume addition is allowed! Error handling should be done in the semantic analysis!
+YYSTYPE add(const YYSTYPE& op1, const YYSTYPE& op2) {
+	// Get basic data - rows, columns, is_matrix, is_int_const... etc.
+	// If we're successfully in add(), op1 are op2 are the same type (and dimension).
+	// is_int_const determined separately.
+	YYSTYPE sum = op1;
+	sum.stack_offset = newTemp();
+	if (op1.is_matrix) {
+		pop_stack(1);	// To align sum's stack_offset field with the following loop
+		for (int i=0; i<op1.rows; ++i) {
+			for (int j=0; j<op1.cols; ++j) {
+				EMIT_OS(s(newTemp()) << "="
+						<< s(op1.stack_offset+i*op1.cols+j) << "+" 
+						<< s(op2.stack_offset+i*op1.cols+j));
+			}
+		}
+	}
+	else {
+		sum.is_int_const = (op1.is_int_const && op2.is_int_const);
+		sum.value = op1.value + op2.value;	// May be garbage, but if sum.is_int_const then it's not
+		EMIT_OS(s(sum.stack_offset) << "=" << s(op1.stack_offset) << "+" << s(op2.stack_offset));
+	}
+	// Add the result into the symbol table, so "exit_scope()" will successfully clear the memory
+	// used.
+	put_temp_in_symbol_table(sum, false);
+	return sum;
+}
+
+// Multiply the two variables.
+// This should work for any combination of operand types.
+// Calculates is_matrix and is_int_const, and the rows/columns if is_matrix=true.
+// ASSUMES MULTIPLICATION IS LEGAL!
+YYSTYPE mul(const YYSTYPE& op1, const YYSTYPE& op2) {
+	YYSTYPE product;
+	product.is_matrix = (op1.is_matrix || op2.is_matrix);
+	// Start by marking the current location:
+	product.stack_offset = newTemp();
+	pop_stack(1);
+	// Split into cases, depending on the multiplication type.
+	// First, the hardest:
+	if (op1.is_matrix && op2.is_matrix) {
+		// Matrix product! What fun!
+		// Set up the new matrix dimensions:
+		product.rows=op1.rows;
+		product.cols=op2.cols;
+		// We need a temporary variable to store cell-by-cell product results.
+		// Take the location at the (soon to be) end of the stack, after the new output matrix,
+		// and simply refrain from updating the stack pointer.
+		int temp_offset = product.stack_offset + product.rows*product.cols;
+		string s_temp = s(temp_offset);
+		for (int row=0; row<product.rows; ++row) {
+			for (int col=0; col<product.cols; ++col) {
+				string cell_location = s(newTemp());
+				emit(cell_location + "=0");
+				for (int k=0; k<op1.cols; ++k) {
+					EMIT_OS(s_temp << "="
+									<< s(op1.stack_offset + row*op1.cols + k) << "*"
+									<< s(op2.stack_offset + k*op2.cols + col));
+					EMIT_OS(cell_location << "=" << cell_location << "+" << s_temp);
+				}
+			}
+		}
+	}
+	// Next, scalar-matrix product:
+	else if (op1.is_matrix || op2.is_matrix) {
+		// Here, just emit code that multiplies the expression with each matrix cell.
+		// Get the stack location of the matrix:
+		int matrix_offset, multiplier_offset;
+		if (op1.is_matrix) {
+			matrix_offset = op1.stack_offset;
+			product.rows = op1.rows;
+			product.cols = op1.cols;
+			multiplier_offset = op2.stack_offset;
+		}
+		else {
+			matrix_offset = op2.stack_offset;
+			product.rows = op2.rows;
+			product.cols = op2.cols;
+			multiplier_offset = op1.stack_offset;
+		}
+		// Output the product calculation code
+		for (int i=0; i<product.rows; ++i) {
+			for (int j=0; j<product.cols; ++j) {
+				EMIT_OS(s(newTemp()) << "="
+										<< s(matrix_offset + i*product.cols + j) << "*"
+										<< s(multiplier_offset));
+			}
+		}
+	}
+	else {
+		product.is_int_const = (op1.is_int_const && op2.is_int_const);
+		product.value = op1.value * op2.value;
+		EMIT_OS(s(newTemp()) << "=" << s(op1.stack_offset) << "*" << s(op2.stack_offset));
+	}
+	// Add to the symbol table (so we can pop it later)
+	put_temp_in_symbol_table(product, false);
+	return product;
+}
+
+// Transposes a matrix (allocates memory for the transposed matrix)
+YYSTYPE transpose(const YYSTYPE& matrix_op)
+{
+	YYSTYPE transposed;
+	
+	// Update internal data
+	set_stype_to_matrix(transposed, "", 
+		matrix_op.cols, matrix_op.rows, 
+		vector< vector<int> >());
+	transposed.matrix.resize(transposed.rows, vector<int>(transposed.cols, 0));
+	
+	// Allocate memory
+	put_temp_in_symbol_table(transposed, true);
+	
+	// Generate code
+	for (int i = 0; i < matrix_op.rows; ++i) {
+		for (int j = 0; j < matrix_op.cols; ++j) {
+			EMIT_OS(s(transposed.stack_offset + j*transposed.cols + i) << "=" <<
+						s(matrix_op.stack_offset + i*matrix_op.cols + j));
+		}
+	}
+	
+	return transposed;
+}
+
+// Takes care of scope cleanup.
+// Pops one element of the symbol table and frees up it's memory
+void exit_scope() {
+	map<string,YYSTYPE> dead_scope = symbol_table.back();
+	for (map<string,YYSTYPE>::iterator i = dead_scope.begin(); i!=dead_scope.end(); ++i) {
+		if (i->second.is_matrix) {
+			pop_stack(i->second.rows * i->second.cols);
+		}
+		else pop_stack(1);
+	}
+	symbol_table.pop_back();
+}
+
+// After validating arguments, basically does:
+// target_stype=matrix_name[row_stype.value][col_stype.value];
+// Also updates the stack_offset field to reflect the cell's location in the stack.
+void handle_matrix_dereference(
+	YYSTYPE& target_stype,
+	string matrix_name, 
+	const YYSTYPE& row_stype, 
+	const YYSTYPE& col_stype) {
+	// This is dereferencing a matrix slot.
+	// Make sure ID is a matrix, both expressions are non-negative numbers
+	// and that they are within the bounds of the rows/columns
+	// of the matrix.
+	// Make sure ID has been declared, and that both Exps on the right are
+	// valid matrix arguments (constant and positive).
+	// Set the left Exp's is_int_const field to 0 (no way to write [1,2;3,4][1,1] - 
+	// cannot dereference a constant matrix).
+	// TODO: Is this legal: [1,2;3,4][1,0]? Should evaluate to 3?
+	YYSTYPE matrix_stype = assert_declared_and_fetch(matrix_name);
+	// Make sure this is a matrix...
+	assert_matrix(matrix_stype);
+	// From the PDF, page 3:
+	// "When dereferencing a cell in a matrix, both numbers must be non-negative
+	// constant integers". So, they must be like the argument arg1,arg2 in
+	// statements like matrix m(arg1,arg2):
+	assert_matrix_dereference_arg(row_stype);
+	assert_matrix_dereference_arg(col_stype);
+
+	assert_in_bounds(matrix_stype, row_stype.value, col_stype.value);
+	set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
+	
+	// Update the stack offset of the dereferenced cell:
+	target_stype.stack_offset = 
+			matrix_stype.stack_offset + 
+			matrix_stype.cols*row_stype.value + col_stype.value;
+}
+
+// Returns a string "s[i]" where i is the input value
+string s(int i) {
+	ostringstream os;
+	os << "s[" << i << "]";
+	return os.str();
+}
+
+	
+// Declares a new variable, including:
+// - Some asserts() (NOT all of them)
+// - Updating the symbol table, including offsets
+// - Outputs IR
+// Assumes it's OK to declare a variable of the given type, but note that it's overloaded for
+// declaring matrices.
+YYSTYPE declare(string name, int value_or_offset, bool is_const) {
+	// Declare:
+	YYSTYPE ret;
+	assert_available_name(name);
+    // We do not set value to it's real value since the value is anyhow used only for const vars.
+	set_stype_to_int(ret, name, 0, false);
+	ret.stack_offset = newTemp();
+    // Emit:
+    ostringstream os;
+	// If value_or_offset is the actual value, output "s[i]=value". Otherwise, if it's the offset
+	// of the variable being assigned from, output "s[i]=s[j]" where "j" is the offset.
+	os << s(ret.stack_offset) << "=";
+	if (is_const)
+		os << value_or_offset;
+	else
+		os << s(value_or_offset);
+	emit(os.str());
+	// Update the symbol table (offset already updated):
+	symbol_table.back()[name] = ret;
+	return ret;
+}
+YYSTYPE declare(string name, int rows, int cols) {
+	// Just use the other function, by sending an empty matrix (full of zeros)
+	YYSTYPE source;
+	source.is_matrix = true;
+	source.matrix.resize(rows, vector<int>(cols, 0));
+	source.rows = rows;
+	source.cols = cols;
+	return declare(name, rows, cols, source, false);
+}
+YYSTYPE declare(string name, int rows, int cols, const YYSTYPE& source, bool is_symbol) {
+	// Declare:
+	YYSTYPE ret;
+	assert_available_name(name);
+	set_stype_to_matrix(ret, name, rows, cols, source.matrix);
+	assert_matrices_of_same_dimensions(ret, source);
+	// Emit code:
+	ret.stack_offset = newTemp();
+	pop_stack(1);				// Do this so we can iterate in a comfortable loop.
+	int offset=0;
+	if (is_symbol)
+		offset = get_stack_offset(source.name);
+	for(int i=0; i<rows; ++i) {
+		for(int j=0; j<cols; ++j) {
+			ostringstream os;
+			// If the input matrix is a symbol, we need to output code referencing the symbol's
+			// location in memory. If not, and we're just copying values, we don't need stack
+			// locations - just source values.
+			os << s(newTemp()) << "=";
+			if (is_symbol)
+				os << s(offset+i*cols+j);
+			else
+				os << source.matrix[i][j];
+			emit(os.str());
+		}
+	}
+	// Update the symbol table:
+	symbol_table.back()[name] = ret;
+	return ret;
+}
+
+// Searches the symbol table for the variable and returns the stack offset.
+int get_stack_offset(const string& name) {
+	YYSTYPE tmp = assert_declared_and_fetch(name); 
+	return tmp.stack_offset;
+}
+
+// Adds a temporary variable into the symbol table, so we can pop it later automatically
+// using exit_scope().
+// If requested, this function will also advance the stack pointer by the amount needed to store
+// the temporary variable in memory.
+// IMPORTANT: For this to work, the STYPE parameter must have valid is_matrix, rows and cols
+// fields. If allocation isn't requested, the stack_offset field must also be valid.
+void put_temp_in_symbol_table(YYSTYPE& stype, bool allocate) {
+	if (allocate) {
+		stype.stack_offset = (newTemp());
+		if (stype.is_matrix) {
+			stack_advance(stype.rows*stype.cols - 1);
+		}
+	}
+	stype.name = s(stype.stack_offset);
+	symbol_table.back()[stype.name] = stype;
+}
+
+void emit_if_statement(string val1, string relop, string val2)
+{
+    _emit_if_statement(val1, relop, val2, "");
+}
+
+void emit_if_statement(string val1, string relop, string val2, int goto_offset)
+{
+    ostringstream goto_offset_os;
+    goto_offset_os << goto_offset;
+
+    _emit_if_statement(val1, relop, val2, goto_offset_os.str());
+}
+
+void _emit_if_statement(string val1, string relop, string val2, string goto_offset)
+{
+    emit("if " + val1 + " " + relop + " " + val2 + " goto " + goto_offset);
+}
+
+// These are for use in the Mat rules, specifically designed for use with MatFirstITer and
+// MatSecondIter.
+// Assumes target.stack_offset is defined and memory has been allocated for the target,
+// and assumes the other YYSTYPEs also have valid stack_offset fields.
+void emit_matrix_construction(YYSTYPE& target, YYSTYPE& first_cell, YYSTYPE& first_row) {
+	YYSTYPE empty_matrix;
+	empty_matrix.is_matrix = true;
+	empty_matrix.rows = empty_matrix.cols = 0;
+	emit_matrix_construction(target, first_cell, first_row, empty_matrix);
+}
+void emit_matrix_construction(YYSTYPE& target, YYSTYPE& first_cell, YYSTYPE& first_row,
+													YYSTYPE& rest_of_matrix) {
+	// Generate the code.
+	// While doing this, assume MatFirstIter and MatSecondIter have valid
+	// stack_offset fields which point to the beginning of the sub-matrices
+	// needed to create the full matrix.
+	
+	// Update the first cell (0,0) from Exp:
+	EMIT_OS(s(target.stack_offset) << "=" << s(first_cell.stack_offset));
+	
+	// Update the first row (0,[1-n]) using MatFirstIter:
+	for (int i=1; i<target.cols; ++i) {
+		EMIT_OS(s(target.stack_offset+i) << "=" << s(first_row.stack_offset+i-1));
+	}
+	
+	// Update the rest using MatSecondIter:
+	for (int i=1; i<target.rows; ++i) {
+		for (int j=0; j<target.cols; ++j) {
+			EMIT_OS(s(target.stack_offset + i*target.cols + j) << "="
+					<< s(rest_of_matrix.stack_offset + (i-1)*target.cols + j));
+		}
+	}
+}
+
+void emit_matrix_printing(YYSTYPE matrix)
+{
+    emit("print \"[\"");
+    for (int row = 0; row < matrix.rows; ++row)
+    {
+        for (int col = 0; col < matrix.cols; ++col)
+        {
+            int stack_offset = matrix.stack_offset + row * matrix.cols + col;
+            emit("print " + s(stack_offset));
+            if (col < matrix.cols - 1) {
+                emit("print \",\"");
+            }
+        }
+        if (row < matrix.rows - 1) {
+            emit("print \";\"");
+        }
+    }
+    emit("printLn \"]\"");
+}
+
+void emit_input(int dest_stack_offset)
+{
+    emit("input " + s(dest_stack_offset));
+}
