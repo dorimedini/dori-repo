@@ -24,7 +24,6 @@ test_types=`ls $testdir`
 #	"declaration_scoping"
 #	"other_scoping"
 #	"arithmetic"
-#	"stack_reuse"
 #	"conditionals"
 #	"loops"
 #	"io"
@@ -84,6 +83,7 @@ function run_tests {
 }
 
 function test_stack_memory {
+	echo "*************************************************************************************"
 	echo "Running stack memory tests:"
 	for i in `ls $stack_test_dir/ | grep -iP "$stack_test_dir\d+.matrix" | sort -n -t_ -k2 | cut -d. -f1`; do
 		echo -n "Running $i ... "
@@ -108,12 +108,13 @@ function test_stack_memory {
 			echo "-------------------------------------------------------------------------------------"
 			echo "====================================================================================="
 		fi
+	echo "*************************************************************************************"
 	done
 }
 
 # If asked by the user, run only a specific category.
 # If it's the stack memory category, it's a bit trickier:
-if [ $1 = $stack_test_dir ]; then
+if [ "$1" = $stack_test_dir ]; then
 	test_stack_memory
 elif [ -n "$1" ]; then
 	echo "*************************************************************************************"
