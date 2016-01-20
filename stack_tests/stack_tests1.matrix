@@ -1,0 +1,8 @@
+{
+	{
+		matrix m(3,4);
+		foreach(x in m)
+			int w=m[1,1];
+	}
+	int k;
+}

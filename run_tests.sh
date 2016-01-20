@@ -13,20 +13,22 @@
 
 # Testing directory
 testdir="tests"
+stack_test_dir="stack_tests"
 
 # Define custom test types
-test_types=(
-	"example"
-	"declarations" 
-	"declaration_scoping"
-	"other_scoping"
-	"arithmetic"
-	"stack_reuse"
-	"conditionals"
-	"loops"
-	"io"
-	"test_"
-)
+test_types=`ls $testdir`
+
+# Hope one day to have tests for all of these:
+#	"example"
+#	"declarations" 
+#	"declaration_scoping"
+#	"other_scoping"
+#	"arithmetic"
+#	"stack_reuse"
+#	"conditionals"
+#	"loops"
+#	"io"
+#	"test_"
 
 # Rebuild the program
 make clean
@@ -74,20 +76,52 @@ function do_test {
 }
 
 # Run example tests
-function run_test {
+function run_tests {
 	echo "Running $1 tests:"
 	for i in `ls $testdir/$1/ | grep -iP "$1\d+.matrix" | sort -n -t_ -k2 | cut -d. -f1`; do
 		do_test $1 $i
 	done
 }
 
-# If asked by the user, run only a specific test:
-if [ -n "$1" ]; then
+function test_stack_memory {
+	echo "Running stack memory tests:"
+	for i in `ls $stack_test_dir/ | grep -iP "$stack_test_dir\d+.matrix" | sort -n -t_ -k2 | cut -d. -f1`; do
+		echo -n "Running $i ... "
+		./ex5.exe < $stack_test_dir/$i.matrix > $stack_test_dir/$i.quads
+		last_line=`cat $stack_test_dir/$i.quads | tail -n1`
+		# Make sure the last quad is "s[0]=0".
+		# This is the convention for all of these tests: try to allocate lots of memory in wierd
+		# ways, and make sure everything is cleaned up after exiting the scope.
+		if [ $last_line = "s[0]=0" ]; then
+			echo "PASSED"
+		else
+			echo "FAILED:"
+			echo -e "\n====================================================================================="
+			echo "-------------------------------------------------------------------------------------"
+			echo "INPUT:"
+			echo "-------------------------------------------------------------------------------------"
+			cat $stack_test_dir/$i.matrix
+			echo -e "\n-------------------------------------------------------------------------------------"
+			echo "QUAD OUTPUT:"
+			echo "-------------------------------------------------------------------------------------"
+			cat $stack_test_dir/$i.quads | nl -v 0
+			echo "-------------------------------------------------------------------------------------"
+			echo "====================================================================================="
+		fi
+	done
+}
+
+# If asked by the user, run only a specific category.
+# If it's the stack memory category, it's a bit trickier:
+if [ $1 = $stack_test_dir ]; then
+	test_stack_memory
+elif [ -n "$1" ]; then
 	echo "*************************************************************************************"
+	# If specified, run only a specific test:
 	if [ -n "$2" ]; then
 		do_test $1 "$1$2"
 	else
-		run_test $1
+		run_tests $1
 	fi
 	echo "*************************************************************************************"
 # Otherwise, run custom tests
@@ -96,7 +130,8 @@ else
 		echo "*************************************************************************************"
 		echo "*************************************************************************************"
 		echo "*************************************************************************************"
-		run_test $test
+		run_tests $test
 	done
+	test_stack_memory
 fi
 

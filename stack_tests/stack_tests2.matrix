@@ -1,0 +1,12 @@
+{
+	{
+		matrix m(1,1);
+		{
+			matrix k(1,1);
+			{
+				matrix k(1,1);
+			}
+		}
+	}
+	int k;
+}

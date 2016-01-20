@@ -1,0 +1,13 @@
+{
+	{
+		matrix m(2,2);
+		foreach (x in m) {
+			int g=10;
+			while(g>0) {
+				g=g-1;
+				matrix k(2,2)=m;
+			}
+		}
+	}
+	int k;
+}
