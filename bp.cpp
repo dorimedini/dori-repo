@@ -14,7 +14,7 @@ int next(){
 
 void emit(string s){
     buffer.insert(buffer.end(), s);
-    DO_DEBUG(cout << s << endl);
+    PRINT_DEBUG(s << endl);
 }
 
 void bp(list<int>& l, int address){
