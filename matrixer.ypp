@@ -1216,7 +1216,11 @@ void handle_matrix_dereference(
 	assert_matrix_dereference_arg(col_stype);
 
 	assert_in_bounds(matrix_stype, row_stype.value, col_stype.value);
-	set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
+	// As we don't always update the .matrix field of the STYPEs, trying to access
+	// matrix_stype.matrix[row_stype.value][col_stype.value] may cause a segmentation fault.
+	// Stop it! We don't need the values anyway
+	// set_stype_to_int(target_stype, "", matrix_stype.matrix[row_stype.value][col_stype.value], false);
+	set_stype_to_int(target_stype, "", 0, false);
 	
 	// Update the stack offset of the dereferenced cell:
 	target_stype.stack_offset = 
