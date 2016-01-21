@@ -1,0 +1,5 @@
+goto 4
+goto 2
+printLn "Fail."
+goto 5
+printLn "Ok."

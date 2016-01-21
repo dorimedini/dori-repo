@@ -1,0 +1,10 @@
+{
+if(true)
+if(true)
+print "Ok.";
+else
+print "Fail.";
+else
+print "Fail.";
+print "Should not print fail...";
+}

@@ -1,0 +1,8 @@
+goto 1
+goto 2
+printLn "Ok."
+goto 7
+printLn "Fail."
+goto 7
+printLn "Fail."
+printLn "Should not print fail..."

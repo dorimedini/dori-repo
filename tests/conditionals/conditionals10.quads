@@ -1,0 +1,5 @@
+goto 1
+goto 4
+printLn "Bad."
+goto 5
+printLn "Ok."

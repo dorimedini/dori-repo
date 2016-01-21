@@ -1,0 +1,8 @@
+{
+if(false){
+if(true)
+print "Fail.";
+}
+else
+print "Ok.";
+}

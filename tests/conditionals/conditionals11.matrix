@@ -1,0 +1,5 @@
+if(true)
+if(true)
+print "Ok.";
+else
+print "Fail.";
